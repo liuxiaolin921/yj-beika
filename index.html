@@ -291,8 +291,8 @@ let cur = null;            // 当前题目对象
 let history = [];          // 浏览历史（用于上一张）
 let view = {mode:'drill', chapter:'', section:'', only:'all', skipEmpty:true, query:''};
 
-function load(){ try{var p=JSON.parse(localStorage.getItem(K)); return Object.assign({mastered:{},weak:{},reviewed:{},cMastered:{},cWeak:{},cReviewed:{},tRead:{},tNotes:{}}, p||{});}catch(e){return {mastered:{},weak:{},reviewed:{},cMastered:{},cWeak:{},cReviewed:{},tRead:{},tNotes:{}};} }
-function save(){ localStorage.setItem(K, JSON.stringify(prog)); scheduleAutoSync(); }
+function load(){ try{var p=JSON.parse(localStorage.getItem(K)); if(!p || typeof p!=='object' || Array.isArray(p)) return {mastered:{},weak:{},reviewed:{},cMastered:{},cWeak:{},cReviewed:{},tRead:{},tNotes:{}}; return Object.assign({mastered:{},weak:{},reviewed:{},cMastered:{},cWeak:{},cReviewed:{},tRead:{},tNotes:{}}, p);}catch(e){return {mastered:{},weak:{},reviewed:{},cMastered:{},cWeak:{},cReviewed:{},tRead:{},tNotes:{}};} }
+function save(){ if(!prog || typeof prog!=='object' || Array.isArray(prog)) return; localStorage.setItem(K, JSON.stringify(prog)); scheduleAutoSync(); }
 function statusOf(id){ if(prog.mastered[id])return 'ok'; if(prog.weak[id])return 'bad'; if(prog.reviewed[id])return 'rev'; return 'new'; }
 
 function chapters(){ const s=new Set(DATA.map(d=>d.chapter)); return [...s]; }
@@ -641,7 +641,7 @@ async function pushNow(){
   setGhStatus('同步中…');
   try{
     if(c.gistId){ const rem=await ghGet(c.token,c.gistId); if(rem&&rem.prog){ prog=mergeProg(prog,rem.prog); save(); updateStats(); refreshSyncStat(); } }
-    else { c.gistId = await ghCreate(c.token, pkgContent()); saveCloudCfg(c); }
+    else { c.gistId = await ghCreate(c.token, pkgContent()); saveCloudCfg(c); document.getElementById('ghGistId').value=c.gistId; }
     await ghUpdate(c.token, c.gistId, pkgContent());
     setGhStatus('已同步 ✓ '+new Date().toLocaleTimeString());
   }catch(e){ setGhStatus('同步失败：'+e.message+'（已保留本机）'); }
@@ -652,7 +652,7 @@ async function enableCloud(){
   if(!token){ setGhStatus('请先填写 Token'); return; }
   const c={enabled:true, token, gistId:gistId||''}; saveCloudCfg(c); setGhStatus('连接中…');
   try{
-    if(!c.gistId){ c.gistId=await ghCreate(c.token, pkgContent()); saveCloudCfg(c); }
+    if(!c.gistId){ c.gistId=await ghCreate(c.token, pkgContent()); saveCloudCfg(c); document.getElementById('ghGistId').value=c.gistId; toast('已自动创建 Gist，ID 已填入'); }
     else { const rem=await ghGet(c.token,c.gistId); if(rem&&rem.prog){ prog=mergeProg(prog,rem.prog); save(); updateStats(); refreshSyncStat(); } }
     await ghUpdate(c.token,c.gistId, pkgContent());
     setGhStatus('已连接并同步 ✓'); toast('GitHub 云同步已启用');
@@ -683,7 +683,8 @@ function copySync(){
   try{ if(document.execCommand('copy')){ done=true; toast('同步码已复制'); } }catch(e){}
   if(!done) toast('请手动长按选中复制');
 }
-function mergeProg(I){
+function mergeImportProg(I){
+  if(!I || typeof I!=='object') return;
   const P = prog;
   const objKeys = ['mastered','weak','reviewed','cMastered','cWeak','cReviewed','tRead'];
   objKeys.forEach(k=>{
@@ -707,7 +708,7 @@ function doImport(raw, mode){
     imp = s.startsWith('{') ? JSON.parse(s) : JSON.parse(decodeURIComponent(escape(atob(s))));
   }catch(e){ toast('同步数据无法识别，请检查后重试'); return; }
   if(!imp || !imp.prog){ toast('同步数据格式不正确'); return; }
-  if(mode==='merge'){ mergeProg(JSON.parse(JSON.stringify(imp.prog))); toast('已合并导入进度'); }
+  if(mode==='merge'){ mergeImportProg(JSON.parse(JSON.stringify(imp.prog))); toast('已合并导入进度'); }
   else { prog = Object.assign({mastered:{},weak:{},reviewed:{},cMastered:{},cWeak:{},cReviewed:{},tRead:{},tNotes:{}}, JSON.parse(JSON.stringify(imp.prog))); save(); updateStats(); toast('已覆盖导入进度'); }
   refreshSyncStat();
   if(view.mode==='case') renderCase();
