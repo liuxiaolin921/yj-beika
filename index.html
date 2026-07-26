@@ -63,8 +63,11 @@
   .btn{flex:1; min-width:90px; border:0; border-radius:12px; padding:13px 10px; font-size:15px;
     font-weight:700; cursor:pointer; color:#fff; background:var(--brand);}
   .btn:active{transform:scale(.98);}
-  .btn.ghost{background:#fff; color:var(--ink); border:1px solid var(--line);}
-  .btn.ok{background:var(--ok);} .btn.bad{background:var(--bad);}
+  .btn.star{color:#5a3d00; font-size:13px; padding:11px 6px; font-weight:700;}
+  .btn.s1{background:linear-gradient(180deg,#ffe08a,#f5c518);}
+  .btn.s2{background:linear-gradient(180deg,#ffd166,#eab308);}
+  .btn.s3{background:linear-gradient(180deg,#f7b733,#d98e04);}
+  .btn.bad{background:var(--bad);}
   .btn.wide{flex:1 1 100%;}
   .flag{font-size:12px; text-align:center; color:var(--sub); margin-top:10px; min-height:16px;}
   /* 列表 */
@@ -77,6 +80,7 @@
   .li .meta{font-size:11px; color:var(--sub); margin-top:4px;}
   .li .badge{display:inline-block; font-size:10px; padding:1px 6px; border-radius:6px; margin-right:4px;}
   .b-ok{background:#e3f6ec; color:var(--ok);} .b-bad{background:#fdeae6; color:var(--bad);}
+  .b-star1{background:#fff4d6; color:#a9790a;} .b-star2{background:#ffe9a8; color:#8a6300;} .b-star3{background:#ffe08a; color:#7a5600;}
   .b-new{background:var(--chip); color:var(--sub);}
   .empty{text-align:center; color:var(--sub); padding:40px 0; font-size:14px;}
   .toast{position:fixed; left:50%; bottom:30px; transform:translateX(-50%);
@@ -137,8 +141,11 @@
     <div class="stats">
       <span class="stat">共 <b id="sTotal">0</b></span>
       <span class="stat">已学 <b id="sRev">0</b></span>
-      <span class="stat">掌握 <b id="sOk">0</b></span>
+      <span class="stat">记住了 <b id="sOk">0</b></span>
       <span class="stat">薄弱 <b id="sBad">0</b></span>
+      <span class="stat" title="一星=基本记得但不熟">一星 <b id="sStar1">0</b></span>
+      <span class="stat" title="二星=较熟练">二星 <b id="sStar2">0</b></span>
+      <span class="stat" title="三星=完全掌握">三星 <b id="sStar3">0</b></span>
       <span class="stat">案例练 <b id="sCaseRev">0</b></span>
       <span class="stat">案例掌握 <b id="sCaseOk">0</b></span>
       <span class="stat">专题页 <b id="sTopicRead">0</b></span>
@@ -153,7 +160,7 @@
       <button id="tabTopic" onclick="setMode('topic')">专题聚焦</button>
     </div>
     <button class="mini sync-btn" onclick="openSync()">🔄 同步</button>
-    <span class="ver" id="verTag" style="align-self:center;font-size:11px;color:var(--sub);margin-left:8px">v20260727-0300</span>
+    <span class="ver" id="verTag" style="align-self:center;font-size:11px;color:var(--sub);margin-left:8px">v20260727-0931</span>
   </div>
   <div class="ctrl" id="drillCtrl">
     <div class="row">
@@ -170,6 +177,9 @@
         <option value="unreviewed">仅未复习</option>
         <option value="weak">仅薄弱</option>
         <option value="mastered">仅掌握</option>
+        <option value="star1">仅一星</option>
+        <option value="star2">仅二星</option>
+        <option value="star3">仅三星</option>
       </select>
       <label class="chk"><input type="checkbox" id="chkSkip" checked onchange="onSkip()"> 跳过无答案题</label>
       <button class="mini danger" onclick="resetProg()">重置进度</button>
@@ -188,8 +198,11 @@
       </div>
       <div class="acts">
         <button class="btn wide" id="btnAns" onclick="toggleAns()">显示答案</button>
-        <button class="btn ok" onclick="mark('mastered')">记住了 ✓</button>
-        <button class="btn bad" onclick="mark('weak')">没记住 ✗</button>
+        <button class="btn bad" onclick="markLevel(0)" title="完全想不起来">没记住 ✗</button>
+        <button class="btn star s1" onclick="markLevel(1)" title="基本记得但不熟">一星 ★</button>
+        <button class="btn star s2" onclick="markLevel(2)" title="较熟练">二星 ★★</button>
+        <button class="btn star s3" onclick="markLevel(3)" title="很熟练">三星 ★★★</button>
+        <button class="btn ok" onclick="markLevel(4)" title="完全掌握、脱口而出">记住了 ✓</button>
         <button class="btn ghost" onclick="prev()">← 上一张</button>
         <button class="btn ghost" onclick="next(true)">随机抽 ✓</button>
         <button class="btn ghost" onclick="next(false)">下一张 →</button>
@@ -291,9 +304,46 @@ let cur = null;            // 当前题目对象
 let history = [];          // 浏览历史（用于上一张）
 let view = {mode:'drill', chapter:'', section:'', only:'all', skipEmpty:true, query:''};
 
-function load(){ try{var p=JSON.parse(localStorage.getItem(K)); if(!p || typeof p!=='object' || Array.isArray(p)) return {mastered:{},weak:{},reviewed:{},cMastered:{},cWeak:{},cReviewed:{},tRead:{},tNotes:{}}; return Object.assign({mastered:{},weak:{},reviewed:{},cMastered:{},cWeak:{},cReviewed:{},tRead:{},tNotes:{}}, p);}catch(e){return {mastered:{},weak:{},reviewed:{},cMastered:{},cWeak:{},cReviewed:{},tRead:{},tNotes:{}};} }
+function defaultProg(){ return {mastered:{},weak:{},reviewed:{},stars:{},cMastered:{},cWeak:{},cReviewed:{},tRead:{},tNotes:{}}; }
+function migrateProg(p){
+  if(!p || typeof p!=='object' || Array.isArray(p)) return null;
+  p.stars = p.stars || {};
+  // 旧版 mastered/weak 进度迁移为星级：master→4(记住了)，weak→0(没记住)
+  Object.keys(p.mastered||{}).forEach(k=>{ if(!(k in p.stars)) p.stars[k]=4; });
+  Object.keys(p.weak||{}).forEach(k=>{ if(!(k in p.stars)) p.stars[k]=0; });
+  if(typeof CASE!=='undefined' && CASE && CASE.length){
+    ['cMastered','cWeak','cReviewed'].forEach(field=>{
+      const obj = p[field] || {};
+      Object.keys(obj).forEach(k=>{
+        const m = k.match(/^c(\d+)$/);
+        if(m){
+          const idx = parseInt(m[1],10);
+          const c = CASE[idx];
+          if(c && c.qa && c.qa.length){
+            c.qa.forEach((_,q)=>{ const nk=`c${idx}_${q}`; if(!obj[nk] || obj[nk]<obj[k]) obj[nk]=obj[k]; });
+            delete obj[k];
+          }
+        }
+      });
+      p[field]=obj;
+    });
+  }
+  return p;
+}
+function load(){ try{var p=JSON.parse(localStorage.getItem(K)); if(!p || typeof p!=='object' || Array.isArray(p)) return defaultProg(); p=migrateProg(p); return Object.assign(defaultProg(), p);}catch(e){return defaultProg();} }
 function save(){ if(!prog || typeof prog!=='object' || Array.isArray(prog)) return; localStorage.setItem(K, JSON.stringify(prog)); scheduleAutoSync(); }
-function statusOf(id){ if(prog.mastered[id])return 'ok'; if(prog.weak[id])return 'bad'; if(prog.reviewed[id])return 'rev'; return 'new'; }
+function levelOf(id){ return (id in prog.stars) ? prog.stars[id] : undefined; }   // undefined=未标记,0=没记住,1=一星,2=二星,3=三星,4=记住了
+function starOf(id){ return levelOf(id); }
+function statusOf(id){
+  const lv=levelOf(id);
+  if(lv>=4) return 'ok';
+  if(lv===3) return 'star3';
+  if(lv===2) return 'star2';
+  if(lv===1) return 'star1';
+  if(lv===0) return 'bad';
+  if(prog.reviewed[id]) return 'rev';
+  return 'new';
+}
 
 function chapters(){ const s=new Set(DATA.map(d=>d.chapter)); return [...s]; }
 function sectionsOf(ch){ return [...new Set(DATA.filter(d=>!ch||d.chapter===ch).map(d=>d.section))]; }
@@ -314,18 +364,27 @@ function visible(){
     if(view.section && it.section!==view.section) return false;
     if(q && !(it.title.toLowerCase().includes(q) || (it.answer||'').toLowerCase().includes(q))) return false;
     const st=statusOf(it.id);
+    const lv=levelOf(it.id);
     if(view.only==='weak' && st!=='bad') return false;
-    if(view.only==='mastered' && st!=='ok') return false;
-    if(view.only==='unreviewed' && (st==='ok'||st==='bad'||st==='rev')) return false;
+    if(view.only==='mastered' && lv!==4) return false;
+    if(view.only==='unreviewed' && st!=='new') return false;
+    if(view.only==='star1' && lv!==1) return false;
+    if(view.only==='star2' && lv!==2) return false;
+    if(view.only==='star3' && lv!==3) return false;
     return true;
   });
 }
 
 function updateStats(){
+  let s1=0,s2=0,s3=0,ok=0,bad=0;
+  DATA.forEach(it=>{ const lv=levelOf(it.id); if(lv>=4)ok++; else if(lv===3)s3++; else if(lv===2)s2++; else if(lv===1)s1++; else if(lv===0)bad++; });
   document.getElementById('sTotal').textContent=DATA.length;
   document.getElementById('sRev').textContent=Object.keys(prog.reviewed).length;
-  document.getElementById('sOk').textContent=Object.keys(prog.mastered).length;
-  document.getElementById('sBad').textContent=Object.keys(prog.weak).length;
+  document.getElementById('sOk').textContent=ok;
+  document.getElementById('sBad').textContent=bad;
+  document.getElementById('sStar1').textContent=s1;
+  document.getElementById('sStar2').textContent=s2;
+  document.getElementById('sStar3').textContent=s3;
   document.getElementById('sCaseRev').textContent=Object.keys(prog.cReviewed||{}).length;
   document.getElementById('sCaseOk').textContent=Object.keys(prog.cMastered||{}).length;
   document.getElementById('sTopicRead').textContent=Object.keys(prog.tRead||{}).length;
@@ -372,7 +431,15 @@ function renderCard(it){
   document.getElementById('btnAns').textContent='显示答案';
   document.getElementById('btnCheck').style.display = (it.ans.length || (it.answer||'').length)?'block':'none';
   const st=statusOf(it.id);
-  const map={ok:'✅ 已掌握',bad:'⚠️ 薄弱',rev:'📖 已复习',new:''};
+  const map={
+    ok:'✅ 已记住 ✓',
+    star3:'⭐⭐⭐ 三星（很熟练）',
+    star2:'⭐⭐ 二星（较熟练）',
+    star1:'⭐ 一星（基本记得但不熟）',
+    bad:'⚠️ 没记住 ✗',
+    rev:'📖 已复习',
+    new:''
+  };
   document.getElementById('flag').textContent = map[st]||'';
 }
 
@@ -390,13 +457,16 @@ function toggleAns(){
   }
 }
 
-function mark(type){
+function markLevel(lv){
   if(!cur) return;
-  if(type==='mastered'){ prog.mastered[cur.id]=Date.now(); delete prog.weak[cur.id]; }
+  prog.stars[cur.id]=lv;
+  prog.reviewed[cur.id]=Date.now();
+  if(lv>=1){ prog.mastered[cur.id]=Date.now(); delete prog.weak[cur.id]; }
   else { prog.weak[cur.id]=Date.now(); delete prog.mastered[cur.id]; }
-  prog.reviewed[cur.id]=Date.now(); save(); updateStats();
-  document.getElementById('flag').textContent = type==='mastered'?'✅ 已标记掌握':'⚠️ 已标记薄弱';
-  toast(type==='mastered'?'已记为掌握':'已记为薄弱');
+  save(); updateStats();
+  const nm=['没记住','一星','二星','三星','记住了'][lv];
+  document.getElementById('flag').textContent = lv===0 ? '⚠️ 没记住 ✗' : (lv>=4 ? '✅ 记住了 ✓' : '⭐ '+nm);
+  toast(nm);
   next(true);
 }
 
@@ -458,8 +528,15 @@ function renderList(){
   const box=document.getElementById('list');
   if(!v.length){ box.innerHTML='<div class="empty">没有符合条件的题目</div>'; return; }
   box.innerHTML=v.map(it=>{
-    const st=statusOf(it.id);
-    const b= st==='ok'?'<span class="badge b-ok">掌握</span>': st==='bad'?'<span class="badge b-bad">薄弱</span>': st==='rev'?'<span class="badge b-new">已学</span>':'<span class="badge b-new">新</span>';
+    const lv=levelOf(it.id);
+    let b;
+    if(lv>=4) b='<span class="badge b-ok">记住了</span>';
+    else if(lv===3) b='<span class="badge b-star3">★★★</span>';
+    else if(lv===2) b='<span class="badge b-star2">★★</span>';
+    else if(lv===1) b='<span class="badge b-star1">★</span>';
+    else if(lv===0) b='<span class="badge b-bad">没记住</span>';
+    else if(prog.reviewed[it.id]) b='<span class="badge b-new">已学</span>';
+    else b='<span class="badge b-new">新</span>';
     return `<div class="li" onclick="openFromList(${it.id})">${b}<div class="qt">${esc(it.title)}</div><div class="meta">${esc(it.chapter)} ＞ ${esc(it.sub)}</div></div>`;
   }).join('');
 }
@@ -627,7 +704,7 @@ async function ghGet(token, id){
 function mergeProg(loc, rem){
   const out = JSON.parse(JSON.stringify(loc));
   if(!rem) return out;
-  ['mastered','weak','reviewed','cMastered','cWeak','cReviewed','tRead'].forEach(f=>{
+  ['mastered','weak','reviewed','stars','cMastered','cWeak','cReviewed','tRead'].forEach(f=>{
     const a=loc[f]||{}, b=rem[f]||{}, o=out[f]||(out[f]={});
     for(const k in b){ if(!(k in a) || (b[k]||0) > (a[k]||0)) o[k]=b[k]; }
   });
@@ -686,7 +763,7 @@ function copySync(){
 function mergeImportProg(I){
   if(!I || typeof I!=='object') return;
   const P = prog;
-  const objKeys = ['mastered','weak','reviewed','cMastered','cWeak','cReviewed','tRead'];
+  const objKeys = ['mastered','weak','reviewed','stars','cMastered','cWeak','cReviewed','tRead'];
   objKeys.forEach(k=>{
     const a = P[k]||{}; const b = I[k]||{};
     Object.keys(b).forEach(id=>{
