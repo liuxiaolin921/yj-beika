@@ -96,6 +96,13 @@
   .b-star1{background:#fff4d6; color:#a9790a;} .b-star2{background:#ffe9a8; color:#8a6300;} .b-star3{background:#ffe08a; color:#7a5600;}
   .b-new{background:var(--chip); color:var(--sub);}
   .empty{text-align:center; color:var(--sub); padding:40px 0; font-size:14px;}
+  /* 列表常驻工具条（快速定位） */
+  .list-bar{position:sticky; top:0; z-index:6; background:var(--bg); padding:8px 0 10px;
+    display:flex; gap:8px; align-items:center; flex-wrap:wrap; border-bottom:1px solid var(--line); margin-bottom:10px;}
+  .list-bar input[type=text]{flex:2; min-width:150px; margin:0;}
+  .list-bar .lhint{flex-basis:100%; font-size:11px; color:var(--sub); margin-top:2px; line-height:1.5;}
+  .li.flash{box-shadow:0 0 0 3px var(--brand); transition:box-shadow .2s;}
+  @media (max-width:480px){ .list-bar input[type=text]{min-width:120px;} }
   .toast{position:fixed; left:50%; bottom:30px; transform:translateX(-50%);
     background:rgba(31,39,51,.92); color:#fff; padding:10px 18px; border-radius:20px; font-size:14px;
     opacity:0; transition:.25s; pointer-events:none; z-index:9;}
@@ -213,7 +220,7 @@
       <button id="tabAudio" onclick="setMode('audio')">音频</button>
     </div>
     <button class="mini sync-btn" onclick="openSync()">🔄 同步</button>
-    <span class="ver" id="verTag" style="align-self:center;font-size:11px;color:var(--sub);margin-left:8px">v20260727-2259</span>
+    <span class="ver" id="verTag" style="align-self:center;font-size:11px;color:var(--sub);margin-left:8px">v20260727-2321</span>
   </div>
   <div class="ctrl" id="drillCtrl">
     <div class="row">
@@ -265,11 +272,22 @@
         <button class="btn ok" onclick="markLevel(4)" title="完全掌握、脱口而出">会了 ✓</button>
       </div>
       <div class="flag" id="flag"></div>
+      <div class="acts">
+        <button class="btn ghost wide" id="btnBackList" onclick="backToList()" style="display:none">← 返回题目列表</button>
+      </div>
     </div>
   </div>
 
   <!-- 列表 -->
-  <div id="list" class="list"></div>
+  <div id="list" class="list">
+    <div id="listBar" class="list-bar">
+      <input type="text" id="listJump" inputmode="numeric" placeholder="跳到列表第 N 题（如 50）" oninput="listJumpTo()">
+      <button class="mini" onclick="listScrollTop()">↑ 顶部</button>
+      <button class="mini" onclick="listScrollBottom()">↓ 底部</button>
+      <span class="lhint">· 输入数字可一键定位到列表第 N 题（按当前筛选后的顺序）。· 上方搜索框可输入关键词实时筛选本列表。· 点任意题目进入批改后，用卡片里的「← 返回题目列表」可回到刚才的位置。</span>
+    </div>
+    <div id="listItems"></div>
+  </div>
 
   <!-- 案例训练 -->
   <div id="case" style="display:none">
@@ -416,6 +434,8 @@ let prog = load();
 let cur = null;            // 当前题目对象
 let history = [];          // 浏览历史（用于上一张）
 let view = {mode:'drill', chapter:'', section:'', only:'all', skipEmpty:true, query:''};
+let _fromList = false;     // 当前抽背是否从「题目列表」进入（决定返回按钮是否显示）
+const scrollPos = {drill:0, list:0, case:0, topic:0, audio:0};  // 各视图滚动位置记忆
 
 function defaultProg(){ return {mastered:{},weak:{},reviewed:{},stars:{},cMastered:{},cWeak:{},cReviewed:{},tStars:{},tReviewed:{},tRead:{},tNotes:{},tAudio:{}}; }
 function migrateProg(p){
@@ -511,6 +531,10 @@ function updateStats(){
 }
 
 function setMode(m){
+  const from = view.mode;
+  // 离开原视图前，保存当前滚动位置（这样返回时不必重新往下翻）
+  if(from && from!==m) scrollPos[from] = window.scrollY || document.documentElement.scrollTop || 0;
+  if(m!=='drill') _fromList = false;   // 切到非抽背视图时，取消「从列表进入」标记
   view.mode=m;
   document.getElementById('tabDrill').classList.toggle('on', m==='drill');
   document.getElementById('tabList').classList.toggle('on', m==='list');
@@ -526,11 +550,15 @@ function setMode(m){
   document.getElementById('case').style.display = isCase?'block':'none';
   document.getElementById('topic').style.display = isTopic?'block':'none';
   document.getElementById('audio').style.display = isAudio?'block':'none';
+  document.getElementById('btnBackList').style.display = (m==='drill' && _fromList) ? '' : 'none';
   if(m==='case'){ if(!CASE[caseView.idx]) caseView.idx=0; renderCase(); }
   else if(m==='topic'){ topicRender(); }
   else if(m==='audio'){ initAudioSel(); renderAudio(); }
   else if(m==='list') renderList();
   else renderCard(cur);
+  // 抽背视图回到顶部；其余浏览视图还原上次滚动位置
+  const y = (m==='drill') ? 0 : (scrollPos[m]||0);
+  requestAnimationFrame(()=>{ window.scrollTo({top:y, behavior:'auto'}); });
 }
 
 function pickRandom(){
@@ -720,7 +748,7 @@ function doImageCheck(){
 
 function renderList(){
   const v=visible();
-  const box=document.getElementById('list');
+  const box=document.getElementById('listItems');
   if(!v.length){ box.innerHTML='<div class="empty">没有符合条件的题目</div>'; return; }
   box.innerHTML=v.map(it=>{
     const lv=levelOf(it.id);
@@ -738,9 +766,26 @@ function renderList(){
 }
 function openFromList(id){
   cur=DATA.find(d=>d.id===id)||null;
+  _fromList=true;
   setMode('drill'); renderCard(cur);
   window.scrollTo({top:0,behavior:'smooth'});
 }
+// 返回题目列表（保留滚动位置，由 setMode 还原）
+function backToList(){ if(view.mode!=='list') setMode('list'); }
+// 列表快速定位：跳到筛选后列表的第 N 题
+function listJumpTo(){
+  const inp=document.getElementById('listJump');
+  const v=parseInt(inp.value,10);
+  if(!v || v<1) return;
+  const items=[...document.querySelectorAll('#listItems .li')];
+  if(!items.length) return;
+  const el=items[Math.min(v,items.length)-1];
+  el.scrollIntoView({block:'center', behavior:'smooth'});
+  el.classList.add('flash');
+  setTimeout(()=>el.classList.remove('flash'), 1200);
+}
+function listScrollTop(){ window.scrollTo({top:0, behavior:'smooth'}); }
+function listScrollBottom(){ window.scrollTo({top:document.body.scrollHeight, behavior:'smooth'}); }
 
 function setView(k,v){ view[k]=v; if(k!=='mode'){ renderCard(cur); if(view.mode==='list') renderList(); } }
 function onChapter(){ view.chapter=document.getElementById('selChapter').value; view.section=''; refreshSelectors(); setMode('drill'); pickRandom(); renderCard(cur); }
