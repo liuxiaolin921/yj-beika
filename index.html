@@ -248,7 +248,7 @@
       <button id="tabTheme" onclick="setMode('theme')">主题卡</button>
     </div>
     <button class="mini sync-btn" onclick="openSync()">🔄 同步</button>
-    <span class="ver" id="verTag" style="align-self:center;font-size:11px;color:var(--sub);margin-left:8px">v20260728-0751</span>
+    <span class="ver" id="verTag" style="align-self:center;font-size:11px;color:var(--sub);margin-left:8px">v20260728-0753</span>
   </div>
   <div class="ctrl" id="drillCtrl">
     <div class="row">
@@ -1065,7 +1065,7 @@ function topicSetMode(x){
 }
 
 // 专题聚焦·问答（章节 → 考点 → 例题，点击显示答案自测）
-function esc(s){ return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function esc(s){ return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>'); }
 function topicQAChap(ci){ topicView.qa.ci=ci; topicView.qa.openKD={}; renderTopicQA(); window.scrollTo({top:0}); }
 function topicQAOpen(ki){ topicView.qa.openKD[ki]=!topicView.qa.openKD[ki]; renderTopicQA(); }
 function topicQAToggle(btn){
