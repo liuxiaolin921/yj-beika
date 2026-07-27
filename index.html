@@ -198,6 +198,7 @@
       <span class="stat">案例掌握 <b id="sCaseOk">0</b></span>
       <span class="stat">专题页 <b id="sTopicRead">0</b></span>
       <span class="stat">专文 <b id="sTopicTxt">0</b></span>
+      <span class="stat" title="绿色高亮音频已听数量">音频 <b id="sAudio">0/0</b></span>
     </div>
   </header>
 
@@ -210,7 +211,7 @@
       <button id="tabAudio" onclick="setMode('audio')">音频</button>
     </div>
     <button class="mini sync-btn" onclick="openSync()">🔄 同步</button>
-    <span class="ver" id="verTag" style="align-self:center;font-size:11px;color:var(--sub);margin-left:8px">v20260727-1504</span>
+    <span class="ver" id="verTag" style="align-self:center;font-size:11px;color:var(--sub);margin-left:8px">v20260727-1514</span>
   </div>
   <div class="ctrl" id="drillCtrl">
     <div class="row">
@@ -500,6 +501,7 @@ function updateStats(){
   document.getElementById('sCaseOk').textContent=Object.keys(prog.cMastered||{}).length;
   document.getElementById('sTopicRead').textContent=Object.keys(prog.tRead||{}).length;
   document.getElementById('sTopicTxt').textContent=Object.keys(prog.tReviewed||{}).length;
+  document.getElementById('sAudio').textContent=Object.keys(prog.tAudio||{}).length + '/' + (AUDIO_ITEMS? AUDIO_ITEMS.length : 0);
 }
 
 function setMode(m){
