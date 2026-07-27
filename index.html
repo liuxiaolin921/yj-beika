@@ -59,12 +59,12 @@
   .diff .miss{color:var(--bad); text-decoration:line-through; opacity:.8;}
   .diff .meta{font-size:13px; color:var(--sub); margin-bottom:6px; border-bottom:1px solid var(--line); padding-bottom:6px;}
   /* 操作按钮 */
-  .acts{display:flex; gap:8px; margin-top:10px; flex-wrap:nowrap;}
-  .acts + .acts{margin-top:8px;}
-  .btn{flex:1; min-width:78px; border:0; border-radius:12px; padding:13px 8px; font-size:15px;
-    font-weight:700; cursor:pointer; color:#fff; background:var(--brand); white-space:nowrap;}
+  .acts{display:flex; gap:6px; margin-top:10px; flex-wrap:wrap;}
+  .acts + .acts{margin-top:6px;}
+  .btn{flex:1; min-width:0; border:0; border-radius:12px; padding:10px 4px; font-size:13px;
+    font-weight:700; cursor:pointer; color:#fff; background:var(--brand); white-space:normal; line-height:1.25; text-align:center; word-break:keep-all;}
   .btn:active{transform:scale(.98);}
-  .btn.star{color:#5a3d00; font-size:13px; padding:11px 4px; font-weight:700; min-width:64px;}
+  .btn.star{color:#5a3d00; font-size:12px; padding:9px 2px; font-weight:700; min-width:0;}
   .btn.s1{background:linear-gradient(180deg,#ffe08a,#f5c518);}
   .btn.s2{background:linear-gradient(180deg,#ffd166,#eab308);}
   .btn.s3{background:linear-gradient(180deg,#f7b733,#d98e04);}
@@ -73,9 +73,14 @@
   .btn.ghost{background:#fff; color:var(--brand); border:1px solid #d6e0f5;}
   .flag{font-size:12px; text-align:center; color:var(--sub); margin-top:10px; min-height:16px;}
   @media (max-width:480px){
-    .acts{flex-wrap:wrap;}
-    .btn{padding:11px 6px; font-size:13px; min-width:60px;}
-    .btn.star{font-size:12px; min-width:52px;}
+    .acts{gap:5px;}
+    .acts + .acts{margin-top:5px;}
+    .btn{padding:9px 3px; font-size:12px; border-radius:10px;}
+    .btn.star{font-size:11px; padding:8px 2px;}
+  }
+  @media (max-width:360px){
+    .btn{font-size:11px; padding:8px 2px;}
+    .btn.star{font-size:10px;}
   }
   /* 列表 */
   .list{display:none;}
@@ -195,7 +200,7 @@
       <button id="tabTopic" onclick="setMode('topic')">专题聚焦</button>
     </div>
     <button class="mini sync-btn" onclick="openSync()">🔄 同步</button>
-    <span class="ver" id="verTag" style="align-self:center;font-size:11px;color:var(--sub);margin-left:8px">v20260727-1435</span>
+    <span class="ver" id="verTag" style="align-self:center;font-size:11px;color:var(--sub);margin-left:8px">v20260727-1452</span>
   </div>
   <div class="ctrl" id="drillCtrl">
     <div class="row">
@@ -228,23 +233,23 @@
       <div class="q" id="qText">—</div>
       <div class="ans" id="ansBox"><div class="body" id="ansBody"></div></div>
       <div class="write" id="writeBox">
-        <textarea id="writeArea" placeholder="在此默写你的答案…（可选，写完点“检查默写”对照）"></textarea>
+        <textarea id="writeArea" placeholder="在此默写你的答案…（可选，写完点“检查”对照）"></textarea>
         <div class="diff" id="diffBox"></div>
       </div>
       <div class="acts">
         <button class="btn wide" id="btnAns" onclick="toggleAns()">显示答案</button>
         <button class="btn ghost wide" id="btnCheck" onclick="checkWrite()" style="display:none">检查默写</button>
-        <button class="btn ghost" onclick="openImageCheck()">🖼️ 图片检查</button>
+        <button class="btn ghost" onclick="openImageCheck()">🖼️ 图片</button>
         <button class="btn ghost" onclick="prev()">← 上一张</button>
-        <button class="btn ghost" onclick="next(true)">随机抽 ✓</button>
+        <button class="btn ghost" onclick="next(true)">随机抽</button>
         <button class="btn ghost" onclick="next(false)">下一张 →</button>
       </div>
       <div class="acts">
-        <button class="btn bad" onclick="markLevel(0)" title="完全想不起来">没记住 ✗</button>
-        <button class="btn star s1" onclick="markLevel(1)" title="基本记得但不熟">一星 ★</button>
-        <button class="btn star s2" onclick="markLevel(2)" title="较熟练">二星 ★★</button>
-        <button class="btn star s3" onclick="markLevel(3)" title="很熟练">三星 ★★★</button>
-        <button class="btn ok" onclick="markLevel(4)" title="完全掌握、脱口而出">记住了 ✓</button>
+        <button class="btn bad" onclick="markLevel(0)" title="完全想不起来">不会 ✗</button>
+        <button class="btn star s1" onclick="markLevel(1)" title="基本记得但不熟">★</button>
+        <button class="btn star s2" onclick="markLevel(2)" title="较熟练">★★</button>
+        <button class="btn star s3" onclick="markLevel(3)" title="很熟练">★★★</button>
+        <button class="btn ok" onclick="markLevel(4)" title="完全掌握、脱口而出">会了 ✓</button>
       </div>
       <div class="flag" id="flag"></div>
     </div>
@@ -267,21 +272,21 @@
       <div class="case-restore" id="caseRestore"></div>
       <div class="ans" id="caseAnsBox"><div class="body" id="caseAnsBody"></div></div>
       <div class="write" id="caseWriteBox">
-        <textarea id="caseWriteArea" placeholder="在此默写 / 列要点…（可选，写完点“检查默写”）"></textarea>
+        <textarea id="caseWriteArea" placeholder="在此默写 / 列要点…（可选，写完点“检查”）"></textarea>
         <div class="diff" id="caseDiffBox"></div>
       </div>
       <div class="acts">
         <button class="btn wide" id="caseBtnAns" onclick="toggleCaseAns()">显示答案</button>
-        <button class="btn ok" onclick="markCase('mastered')">答对 ✓</button>
-        <button class="btn bad" onclick="markCase('weak')">卡住 ✗</button>
+        <button class="btn ok" onclick="markCase('mastered')">✓ 答对</button>
+        <button class="btn bad" onclick="markCase('weak')">✗ 卡住</button>
         <button class="btn ghost" onclick="casePrevQ()">← 上一问</button>
         <button class="btn ghost" onclick="caseNextQ()">下一问 →</button>
-        <button class="btn ghost wide" id="caseBtnCheck" onclick="checkCaseWrite()" style="display:none">检查默写</button>
+        <button class="btn ghost wide" id="caseBtnCheck" onclick="checkCaseWrite()" style="display:none">检查</button>
       </div>
       <div class="acts">
-        <button class="btn ghost" onclick="casePrevCase()">← 上一案例</button>
-        <button class="btn ghost" onclick="caseRandCase()">随机案例</button>
-        <button class="btn ghost" onclick="caseNextCase()">下一案例 →</button>
+        <button class="btn ghost" onclick="casePrevCase()">← 上案例</button>
+        <button class="btn ghost" onclick="caseRandCase()">随机</button>
+        <button class="btn ghost" onclick="caseNextCase()">下案例 →</button>
       </div>
       <div class="flag" id="caseFlag"></div>
     </div>
@@ -874,11 +879,11 @@ function renderTopicTxt(){
         </div>
         <div class="ans" id="tans-${it.id}"><div class="body">${ansText}</div></div>
         <div class="acts">
-          <button class="btn bad" onclick="topicMark('${it.id}',0)">没记住 ✗</button>
-          <button class="btn star s1" onclick="topicMark('${it.id}',1)">一星 ★</button>
-          <button class="btn star s2" onclick="topicMark('${it.id}',2)">二星 ★★</button>
-          <button class="btn star s3" onclick="topicMark('${it.id}',3)">三星 ★★★</button>
-          <button class="btn ok" onclick="topicMark('${it.id}',4)">记住了 ✓</button>
+          <button class="btn bad" onclick="topicMark('${it.id}',0)" title="完全想不起来">不会 ✗</button>
+          <button class="btn star s1" onclick="topicMark('${it.id}',1)" title="基本记得但不熟">★</button>
+          <button class="btn star s2" onclick="topicMark('${it.id}',2)" title="较熟练">★★</button>
+          <button class="btn star s3" onclick="topicMark('${it.id}',3)" title="很熟练">★★★</button>
+          <button class="btn ok" onclick="topicMark('${it.id}',4)" title="完全掌握、脱口而出">会了 ✓</button>
           <button class="btn ghost" onclick="topicGotoPageFromItem('${it.id}')">📖 看原书第${it.page}页</button>
         </div>
       </div>
@@ -1081,7 +1086,7 @@ refreshSelectors(); updateStats(); initCaseSel(); initTopicSel(); pickRandom(); 
   <div class="modal">
     <button class="close-x" onclick="closeImageCheck()">×</button>
     <h3>图片OCR答案检查</h3>
-    <div class="ocr-tip">在纸上默写后，拍照或截图上传。当前版本需你先用手机/WPS的“图片转文字”把识别结果复制到下方文本框，再点“检查默写”。后续可接入OCR API实现一键自动识别。</div>
+    <div class="ocr-tip">在纸上默写后，拍照或截图上传。当前版本需你先用手机/WPS的“图片转文字”把识别结果复制到下方文本框，再点“检查”。后续可接入OCR API实现一键自动识别。</div>
     <div class="img-drop" id="imgDrop" onclick="document.getElementById('imgFile').click()">
       <div class="hint" id="imgPlaceholder">点击上传或拍照<br>也可在电脑按 Ctrl+V / 手机长按粘贴图片</div>
       <img id="imgPreview" alt="预览" style="display:none;">
