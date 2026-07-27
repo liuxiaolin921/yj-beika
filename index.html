@@ -209,6 +209,10 @@
   .acard .aplayer{width:100%; margin:8px 0; height:38px;}
   .acard .aans{font-size:13px; color:var(--sub); margin-top:6px; white-space:pre-wrap; word-break:break-word; display:none; line-height:1.7;}
   .acard.open .aans{display:block;}
+  .acard .atranscript{font-size:13px; color:var(--sub); margin-top:8px; white-space:pre-wrap; word-break:break-word; display:none; line-height:1.7; background:rgba(26,115,232,0.07); border-left:3px solid #1a73e8; padding:10px 12px; border-radius:8px;}
+  .acard.open-text .atranscript{display:block;}
+  .acard .atranscript .q{color:var(--txt); font-weight:600;}
+  .acard .atranscript .a{color:var(--sub);}
   .acard .aacts{display:flex; gap:10px; margin-top:8px; align-items:center; flex-wrap:wrap;}
   .acard .badge-listened{font-size:12px; color:var(--ok); font-weight:700;}
   .acard .badge-unlistened{font-size:12px; color:var(--sub);}
@@ -248,7 +252,7 @@
       <button id="tabTheme" onclick="setMode('theme')">主题卡</button>
     </div>
     <button class="mini sync-btn" onclick="openSync()">🔄 同步</button>
-    <span class="ver" id="verTag" style="align-self:center;font-size:11px;color:var(--sub);margin-left:8px">v20260728-0753</span>
+    <span class="ver" id="verTag" style="align-self:center;font-size:11px;color:var(--sub);margin-left:8px">v20260728-0813</span>
   </div>
   <div class="ctrl" id="drillCtrl">
     <div class="row">
@@ -1289,9 +1293,11 @@ function renderAudio(){
       <div class="ach"><span class="aqnum">${it.idx}.</span> ${esc(it.q)}</div>
       <audio class="aplayer" controls preload="none" src="${escAttr(encodeURI(it.mp3))}" onended="markAudio(this.dataset.mp3)"></audio>
       <div class="aacts">
+        <button class="mini" onclick="toggleAudioText(this)">📝 音频文本</button>
         <button class="mini" onclick="toggleAudioAns(this)">显示文字答案</button>
         <span class="${heard?'badge-listened':'badge-unlistened'}">${heard?'✓ 已听':'○ 未听'}</span>
       </div>
+      <div class="atranscript"><span class="q">问：${esc(it.q||'')}</span><br><br><span class="a">答：${esc(it.a||'（无文字答案）')}</span></div>
       <div class="aans">${esc(it.a||'（无文字答案）')}</div>
     </div>`;
   }).join('');
@@ -1312,6 +1318,11 @@ function toggleAudioAns(btn){
   const card=btn.closest('.acard');
   card.classList.toggle('open');
   btn.textContent = card.classList.contains('open') ? '隐藏文字答案' : '显示文字答案';
+}
+function toggleAudioText(btn){
+  const card=btn.closest('.acard');
+  card.classList.toggle('open-text');
+  btn.textContent = card.classList.contains('open-text') ? '隐藏音频文本' : '📝 音频文本';
 }
 function onAudioChap(){ aview.chapter=document.getElementById('selAudioChap').value; renderAudio(); }
 function onAudioQuery(){ aview.query=document.getElementById('audioQuery').value; renderAudio(); }
