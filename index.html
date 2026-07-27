@@ -200,7 +200,7 @@
       <button id="tabTopic" onclick="setMode('topic')">专题聚焦</button>
     </div>
     <button class="mini sync-btn" onclick="openSync()">🔄 同步</button>
-    <span class="ver" id="verTag" style="align-self:center;font-size:11px;color:var(--sub);margin-left:8px">v20260727-1452</span>
+    <span class="ver" id="verTag" style="align-self:center;font-size:11px;color:var(--sub);margin-left:8px">v20260727-1454</span>
   </div>
   <div class="ctrl" id="drillCtrl">
     <div class="row">
@@ -238,7 +238,7 @@
       </div>
       <div class="acts">
         <button class="btn wide" id="btnAns" onclick="toggleAns()">显示答案</button>
-        <button class="btn ghost wide" id="btnCheck" onclick="checkWrite()" style="display:none">检查默写</button>
+        <button class="btn ghost wide" id="btnCheck" onclick="checkWrite()" style="display:none">检查</button>
         <button class="btn ghost" onclick="openImageCheck()">🖼️ 图片</button>
         <button class="btn ghost" onclick="prev()">← 上一张</button>
         <button class="btn ghost" onclick="next(true)">随机抽</button>
@@ -654,7 +654,7 @@ function doImageCheck(){
   document.getElementById('writeArea').value = text;
   closeImageCheck();
   prog.reviewed[cur.id]=Date.now(); save(); updateStats();
-  toast('已用图片识别结果检查默写');
+  toast('已用图片识别结果检查');
 }
 
 function renderList(){
@@ -1097,7 +1097,7 @@ refreshSelectors(); updateStats(); initCaseSel(); initTopicSel(); pickRandom(); 
       <textarea id="imgOcrText" placeholder="在此粘贴手机/WPS OCR识别出的文字…"></textarea>
     </div>
     <div class="row2" style="margin-top:14px;">
-      <button class="btn" style="flex:2" onclick="doImageCheck()">检查默写</button>
+      <button class="btn" style="flex:2" onclick="doImageCheck()">检查</button>
       <button class="mini" onclick="closeImageCheck()">关闭</button>
     </div>
   </div>
