@@ -59,17 +59,24 @@
   .diff .miss{color:var(--bad); text-decoration:line-through; opacity:.8;}
   .diff .meta{font-size:13px; color:var(--sub); margin-bottom:6px; border-bottom:1px solid var(--line); padding-bottom:6px;}
   /* 操作按钮 */
-  .acts{display:flex; gap:8px; margin-top:16px; flex-wrap:wrap;}
-  .btn{flex:1; min-width:90px; border:0; border-radius:12px; padding:13px 10px; font-size:15px;
-    font-weight:700; cursor:pointer; color:#fff; background:var(--brand);}
+  .acts{display:flex; gap:8px; margin-top:10px; flex-wrap:nowrap;}
+  .acts + .acts{margin-top:8px;}
+  .btn{flex:1; min-width:78px; border:0; border-radius:12px; padding:13px 8px; font-size:15px;
+    font-weight:700; cursor:pointer; color:#fff; background:var(--brand); white-space:nowrap;}
   .btn:active{transform:scale(.98);}
-  .btn.star{color:#5a3d00; font-size:13px; padding:11px 6px; font-weight:700;}
+  .btn.star{color:#5a3d00; font-size:13px; padding:11px 4px; font-weight:700; min-width:64px;}
   .btn.s1{background:linear-gradient(180deg,#ffe08a,#f5c518);}
   .btn.s2{background:linear-gradient(180deg,#ffd166,#eab308);}
   .btn.s3{background:linear-gradient(180deg,#f7b733,#d98e04);}
   .btn.bad{background:var(--bad);}
   .btn.wide{flex:1 1 100%;}
+  .btn.ghost{background:#fff; color:var(--brand); border:1px solid #d6e0f5;}
   .flag{font-size:12px; text-align:center; color:var(--sub); margin-top:10px; min-height:16px;}
+  @media (max-width:480px){
+    .acts{flex-wrap:wrap;}
+    .btn{padding:11px 6px; font-size:13px; min-width:60px;}
+    .btn.star{font-size:12px; min-width:52px;}
+  }
   /* 列表 */
   .list{display:none;}
   .list.show{display:block;}
@@ -147,8 +154,14 @@
   .modal .radio{display:flex; gap:16px; margin:4px 0 10px; flex-wrap:wrap;}
   .modal .radio label{font-size:14px; cursor:pointer;}
   .modal .close-x{position:absolute; top:12px; right:14px; font-size:24px; line-height:1; cursor:pointer; color:var(--sub); background:none; border:none;}
-  .copy-hint{font-size:12px; color:var(--sub); margin-top:6px; line-height:1.6;}
-  .sync-stat{font-size:13px; color:var(--sub);}
+.copy-hint{font-size:12px; color:var(--sub); margin-top:6px; line-height:1.6;}
+.sync-stat{font-size:13px; color:var(--sub);}
+  /* 图片OCR检查弹窗 */
+  .img-drop{border:2px dashed var(--line); border-radius:14px; padding:22px; text-align:center; color:var(--sub); cursor:pointer; background:var(--bg); transition:.2s;}
+  .img-drop:hover{border-color:var(--brand); color:var(--brand);}
+  .img-drop img{max-width:100%; max-height:46vh; border-radius:10px; display:block; margin:0 auto;}
+  .img-drop .hint{font-size:13px; line-height:1.7;}
+  .ocr-tip{background:#fff8ec; border-left:3px solid var(--warn); padding:10px 12px; border-radius:8px; font-size:13px; color:var(--sub); line-height:1.7; margin-bottom:12px;}
 </style>
   <link rel="manifest" href="./manifest.webmanifest">
   <link rel="icon" href="./favicon.ico" type="image/x-icon">
@@ -182,7 +195,7 @@
       <button id="tabTopic" onclick="setMode('topic')">专题聚焦</button>
     </div>
     <button class="mini sync-btn" onclick="openSync()">🔄 同步</button>
-    <span class="ver" id="verTag" style="align-self:center;font-size:11px;color:var(--sub);margin-left:8px">v20260727-1146</span>
+    <span class="ver" id="verTag" style="align-self:center;font-size:11px;color:var(--sub);margin-left:8px">v20260727-1432</span>
   </div>
   <div class="ctrl" id="drillCtrl">
     <div class="row">
@@ -220,15 +233,18 @@
       </div>
       <div class="acts">
         <button class="btn wide" id="btnAns" onclick="toggleAns()">显示答案</button>
+        <button class="btn ghost wide" id="btnCheck" onclick="checkWrite()" style="display:none">检查默写</button>
+        <button class="btn ghost" onclick="openImageCheck()">🖼️ 图片检查</button>
+        <button class="btn ghost" onclick="prev()">← 上一张</button>
+        <button class="btn ghost" onclick="next(true)">随机抽 ✓</button>
+        <button class="btn ghost" onclick="next(false)">下一张 →</button>
+      </div>
+      <div class="acts">
         <button class="btn bad" onclick="markLevel(0)" title="完全想不起来">没记住 ✗</button>
         <button class="btn star s1" onclick="markLevel(1)" title="基本记得但不熟">一星 ★</button>
         <button class="btn star s2" onclick="markLevel(2)" title="较熟练">二星 ★★</button>
         <button class="btn star s3" onclick="markLevel(3)" title="很熟练">三星 ★★★</button>
         <button class="btn ok" onclick="markLevel(4)" title="完全掌握、脱口而出">记住了 ✓</button>
-        <button class="btn ghost" onclick="prev()">← 上一张</button>
-        <button class="btn ghost" onclick="next(true)">随机抽 ✓</button>
-        <button class="btn ghost" onclick="next(false)">下一张 →</button>
-        <button class="btn ghost wide" id="btnCheck" onclick="checkWrite()" style="display:none">检查默写对照</button>
       </div>
       <div class="flag" id="flag"></div>
     </div>
@@ -543,8 +559,9 @@ function next(rand){
 }
 
 function computeDiff(rawUser, rawAns){
+  // 规则：用户答案中与标准答案连续3个及以上字符相同的片段标绿；不足3字的不算命中，也不标红。
   const candidates = [...new Set(rawUser.split(/[^\u4e00-\u9fa5a-zA-Z0-9]+/).filter(Boolean))]
-    .sort((a,b)=>b.length-a.length).filter(s=>s.length>=2);
+    .sort((a,b)=>b.length-a.length).filter(s=>s.length>=3);
   const n = rawAns.length;
   const covered = new Array(n).fill(false);
   let i=0;
@@ -553,7 +570,7 @@ function computeDiff(rawUser, rawAns){
     for(const c of candidates){
       if(c.length>best && i+c.length<=n && rawAns.substr(i,c.length)===c) best=c.length;
     }
-    if(best>0){ for(let k=0;k<best;k++) covered[i+k]=true; i+=best; }
+    if(best>=3){ for(let k=0;k<best;k++) covered[i+k]=true; i+=best; }
     else i++;
   }
   let html='', buf='', bufIsWord=false, bufHit=false;
@@ -573,7 +590,7 @@ function computeDiff(rawUser, rawAns){
     if(isWord){ totalChars++; if(st) hitChars++; }
   }
   flush();
-  return {html:`<div class="meta">你写出的内容约占标准答案 ${hitChars}/${totalChars} 字（绿=已写出，红删除线=遗漏）</div>`+html, hitChars, totalChars};
+  return {html:`<div class="meta">你写出的内容约占标准答案 ${hitChars}/${totalChars} 字（绿=连续3字及以上相同，红删除线=遗漏）</div>`+html, hitChars, totalChars};
 }
 
 function checkWrite(){
@@ -582,6 +599,57 @@ function checkWrite(){
   const diff=document.getElementById('diffBox');
   diff.innerHTML=html; diff.classList.add('show');
   prog.reviewed[cur.id]=Date.now(); save(); updateStats();
+}
+
+// ===== 图片OCR答案检查 =====
+let _imgPasteHandler=null;
+function openImageCheck(){
+  document.getElementById('imgCheckMask').classList.add('show');
+  document.getElementById('imgOcrText').value='';
+  document.getElementById('imgPreview').style.display='none';
+  document.getElementById('imgPreview').src='';
+  document.getElementById('imgPlaceholder').style.display='block';
+  if(_imgPasteHandler) document.removeEventListener('paste', _imgPasteHandler);
+  _imgPasteHandler = function(e){
+    const items = e.clipboardData && e.clipboardData.items;
+    if(!items) return;
+    for(let i=0;i<items.length;i++){
+      if(items[i].type.indexOf('image')===0){
+        const blob=items[i].getAsFile();
+        if(blob){ showImgPreview(blob); }
+        e.preventDefault();
+        break;
+      }
+    }
+  };
+  document.addEventListener('paste', _imgPasteHandler);
+}
+function closeImageCheck(){
+  document.getElementById('imgCheckMask').classList.remove('show');
+  if(_imgPasteHandler){ document.removeEventListener('paste', _imgPasteHandler); _imgPasteHandler=null; }
+}
+function showImgPreview(blob){
+  const url = URL.createObjectURL(blob);
+  const img = document.getElementById('imgPreview');
+  img.src = url; img.style.display='block';
+  document.getElementById('imgPlaceholder').style.display='none';
+  img.onload = ()=>{ URL.revokeObjectURL(url); };
+}
+function onImgFile(input){
+  const f = input.files && input.files[0];
+  if(f) showImgPreview(f);
+}
+function doImageCheck(){
+  if(!cur || !cur.ans.length){ toast('此题无答案可对照'); return; }
+  const text = document.getElementById('imgOcrText').value;
+  if(!text.trim()){ toast('请先在“识别文字”框里粘贴或输入识别结果'); return; }
+  const {html}=computeDiff(text, cur.answer||'');
+  const diff=document.getElementById('diffBox');
+  diff.innerHTML=html; diff.classList.add('show');
+  document.getElementById('writeArea').value = text;
+  closeImageCheck();
+  prog.reviewed[cur.id]=Date.now(); save(); updateStats();
+  toast('已用图片识别结果检查默写');
 }
 
 function renderList(){
@@ -1008,6 +1076,28 @@ function doImportFromUI(){
 // 初始化
 refreshSelectors(); updateStats(); initCaseSel(); initTopicSel(); pickRandom(); renderCard(cur); loadCloudOnStart();
 </script>
+<!-- 图片OCR答案检查弹窗 -->
+<div class="modal-mask" id="imgCheckMask" onclick="if(event.target===this)closeImageCheck()">
+  <div class="modal">
+    <button class="close-x" onclick="closeImageCheck()">×</button>
+    <h3>图片OCR答案检查</h3>
+    <div class="ocr-tip">在纸上默写后，拍照或截图上传。当前版本需你先用手机/WPS的“图片转文字”把识别结果复制到下方文本框，再点“检查默写”。后续可接入OCR API实现一键自动识别。</div>
+    <div class="img-drop" id="imgDrop" onclick="document.getElementById('imgFile').click()">
+      <div class="hint" id="imgPlaceholder">点击上传或拍照<br>也可在电脑按 Ctrl+V / 手机长按粘贴图片</div>
+      <img id="imgPreview" alt="预览" style="display:none;">
+    </div>
+    <input type="file" id="imgFile" accept="image/*" capture="environment" style="display:none" onchange="onImgFile(this)">
+    <div class="sec">
+      <h4>识别文字（可修改）</h4>
+      <textarea id="imgOcrText" placeholder="在此粘贴手机/WPS OCR识别出的文字…"></textarea>
+    </div>
+    <div class="row2" style="margin-top:14px;">
+      <button class="btn" style="flex:2" onclick="doImageCheck()">检查默写</button>
+      <button class="mini" onclick="closeImageCheck()">关闭</button>
+    </div>
+  </div>
+</div>
+
 <!-- 进度跨端同步弹窗 -->
 <div class="modal-mask" id="syncMask" onclick="if(event.target===this)closeSync()">
   <div class="modal">
