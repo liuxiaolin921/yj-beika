@@ -209,10 +209,12 @@
   .acard .aplayer{width:100%; margin:8px 0; height:38px;}
   .acard .aans{font-size:13px; color:var(--sub); margin-top:6px; white-space:pre-wrap; word-break:break-word; display:none; line-height:1.7;}
   .acard.open .aans{display:block;}
-  .acard .atranscript{font-size:13px; color:var(--sub); margin-top:8px; white-space:pre-wrap; word-break:break-word; display:none; line-height:1.7; background:rgba(26,115,232,0.07); border-left:3px solid #1a73e8; padding:10px 12px; border-radius:8px;}
+  .acard .atranscript{font-size:13px; color:var(--sub); margin-top:8px; white-space:pre-wrap; word-break:break-word; display:none; line-height:1.8; background:rgba(26,115,232,0.07); border-left:3px solid #1a73e8; padding:10px 12px; border-radius:8px;}
   .acard.open-text .atranscript{display:block;}
   .acard .atranscript .q{color:var(--txt); font-weight:600;}
   .acard .atranscript .a{color:var(--sub);}
+  .acard .atranscript .sen{border-radius:4px; padding:0 1px; transition:background .15s;}
+  .acard .atranscript .sen.cur{background:rgba(255,193,7,0.32); box-shadow:0 0 0 2px rgba(255,193,7,0.4);}
   .acard .aacts{display:flex; gap:10px; margin-top:8px; align-items:center; flex-wrap:wrap;}
   .acard .badge-listened{font-size:12px; color:var(--ok); font-weight:700;}
   .acard .badge-unlistened{font-size:12px; color:var(--sub);}
@@ -252,7 +254,7 @@
       <button id="tabTheme" onclick="setMode('theme')">主题卡</button>
     </div>
     <button class="mini sync-btn" onclick="openSync()">🔄 同步</button>
-    <span class="ver" id="verTag" style="align-self:center;font-size:11px;color:var(--sub);margin-left:8px">v20260728-0813</span>
+    <span class="ver" id="verTag" style="align-self:center;font-size:11px;color:var(--sub);margin-left:8px">v20260728-0817</span>
   </div>
   <div class="ctrl" id="drillCtrl">
     <div class="row">
@@ -1291,13 +1293,13 @@ function renderAudio(){
       const heard = prog.tAudio && prog.tAudio[it.idx];
     return `<div class="acard ${heard?'listened':''}" data-idx="${it.idx}">
       <div class="ach"><span class="aqnum">${it.idx}.</span> ${esc(it.q)}</div>
-      <audio class="aplayer" controls preload="none" src="${escAttr(encodeURI(it.mp3))}" onended="markAudio(this.dataset.mp3)"></audio>
+      <audio class="aplayer" controls preload="none" src="${escAttr(encodeURI(it.mp3))}" onended="markAudio(this.closest('.acard').dataset.idx); audioSyncEnd(this)" onplay="audioSyncStart(this)" onpause="audioSyncPause(this)" ontimeupdate="audioSyncTick(this)"></audio>
       <div class="aacts">
         <button class="mini" onclick="toggleAudioText(this)">📝 音频文本</button>
         <button class="mini" onclick="toggleAudioAns(this)">显示文字答案</button>
         <span class="${heard?'badge-listened':'badge-unlistened'}">${heard?'✓ 已听':'○ 未听'}</span>
       </div>
-      <div class="atranscript"><span class="q">问：${esc(it.q||'')}</span><br><br><span class="a">答：${esc(it.a||'（无文字答案）')}</span></div>
+      <div class="atranscript">${transcriptHTML(it)}</div>
       <div class="aans">${esc(it.a||'（无文字答案）')}</div>
     </div>`;
   }).join('');
@@ -1323,6 +1325,65 @@ function toggleAudioText(btn){
   const card=btn.closest('.acard');
   card.classList.toggle('open-text');
   btn.textContent = card.classList.contains('open-text') ? '隐藏音频文本' : '📝 音频文本';
+}
+function splitSentences(s){
+  s=(s||'').replace(/\r/g,'').trim();
+  if(!s) return [];
+  const parts=s.split(/(?<=[。！？!?\n])/);
+  const out=[];
+  parts.forEach(p=>{ const t=p.trim(); if(t) out.push(t); });
+  return out;
+}
+function transcriptHTML(it){
+  const q=splitSentences(it.q);
+  const a=splitSentences(it.a||'（无文字答案）');
+  let h='<div class="q">问：'+q.map(s=>'<span class="sen">'+esc(s)+'</span>').join('')+'</div>';
+  h+='<div class="a" style="margin-top:6px">答：'+a.map(s=>'<span class="sen">'+esc(s)+'</span>').join('')+'</div>';
+  return h;
+}
+// 朗读时按句同步高亮（按字数占比估算每句时间，无需重生成音频）
+function audioSyncCompute(audioEl){
+  const card=audioEl.closest('.acard'); if(!card) return false;
+  const tr=card.querySelector('.atranscript'); if(!tr) return false;
+  const sens=[].slice.call(tr.querySelectorAll('.sen'));
+  if(!sens.length) return false;
+  const dur=audioEl.duration;
+  if(!isFinite(dur)||dur<=0) return false;
+  let total=0; sens.forEach(s=>total+=s.textContent.trim().length);
+  if(total<=0) return false;
+  let acc=0;
+  sens.forEach(s=>{
+    const f=s.textContent.trim().length/total, st=acc*dur; acc+=f;
+    s._t0=st; s._t1=acc*dur;
+  });
+  audioEl._sens=sens; audioEl._synced=true;
+  return true;
+}
+function audioSyncTick(audioEl){
+  if(!audioEl._synced){ if(!audioSyncCompute(audioEl)) return; }
+  const sens=audioEl._sens||[]; if(!sens.length) return;
+  const t=audioEl.currentTime; let cur=null;
+  for(let i=0;i<sens.length;i++){ if(t>=sens[i]._t0 && t<sens[i]._t1){ cur=sens[i]; break; } }
+  if(!cur && t>=sens[sens.length-1]._t1) cur=sens[sens.length-1];
+  if(cur!==audioEl._curSen){
+    if(audioEl._curSen) audioEl._curSen.classList.remove('cur');
+    if(cur){ cur.classList.add('cur'); try{ cur.scrollIntoView({block:'center',behavior:'smooth'}); }catch(e){} }
+    audioEl._curSen=cur;
+  }
+}
+function audioSyncStart(audioEl){
+  const card=audioEl.closest('.acard'); if(!card) return;
+  if(!card.classList.contains('open-text')){
+    card.classList.add('open-text');
+    const btn=card.querySelector('.aacts button[onclick^="toggleAudioText"]');
+    if(btn) btn.textContent='隐藏音频文本';
+  }
+  audioEl._synced=false; audioSyncTick(audioEl);
+}
+function audioSyncPause(audioEl){ /* 暂停时保留高亮，便于对照 */ }
+function audioSyncEnd(audioEl){
+  if(audioEl._curSen){ audioEl._curSen.classList.remove('cur'); audioEl._curSen=null; }
+  audioEl._synced=false;
 }
 function onAudioChap(){ aview.chapter=document.getElementById('selAudioChap').value; renderAudio(); }
 function onAudioQuery(){ aview.query=document.getElementById('audioQuery').value; renderAudio(); }
