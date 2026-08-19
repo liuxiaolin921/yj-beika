@@ -69,6 +69,8 @@
   .diff.show{display:block;}
   .diff .hit{color:var(--ok);}
   .diff .miss{color:var(--bad); text-decoration:line-through; opacity:.8;}
+  .diff-cap{font-size:12px; font-weight:600; color:var(--muted); margin:8px 0 2px;}
+  .diff-box{background:var(--card); border:1px solid var(--line); border-radius:8px; padding:8px 10px; font-size:14px; line-height:1.8; white-space:pre-wrap; word-break:break-word;}
   .qa-pt{padding:3px 8px; border-radius:4px; margin:2px 0; font-size:14px; line-height:1.55;}
   .qa-pt.hit{color:var(--ok); background:rgba(52,199,89,.08);}
   .qa-pt.miss{color:var(--bad); text-decoration:line-through; opacity:.85; background:rgba(255,59,48,.05);}
@@ -275,7 +277,7 @@
       <button id="tabAudio" onclick="setMode('audio')">音频</button>
     </div>
     <button class="mini sync-btn" onclick="openSync()">🔄 同步</button>
-    <span class="ver" id="verTag" style="align-self:center;font-size:11px;color:var(--sub);margin-left:8px">v20260819-1311</span>
+    <span class="ver" id="verTag" style="align-self:center;font-size:11px;color:var(--sub);margin-left:8px">v20260820-0826</span>
   </div>
   <div class="ctrl" id="drillCtrl">
     <div class="row">
@@ -855,72 +857,94 @@ function lcsLen(x, y){
   return dp[0][0];
 }
 
-// 字符级对照（整句退化路径，规则同前：连续2字标绿、标点中性）
+// 字符级对照：以“你写的答案”为主，逐字与标准答案比对——
+// 连续≥2字相同 → 标绿；与标准不一致/多写(漏掉的) → 红删除线；标点不计入、默认正确。
+// 下方再附“标准答案”原文对照（同样逐字标色，红＝你漏写的部分），方便查漏补缺。
 function diffChar(rawUser, rawAns){
-  const a = [...rawAns].map(c => ({c, p: PUNCT.test(c)}));
-  const b = [...rawUser].filter(c => !PUNCT.test(c));
+  const a = [...rawAns].map(c => ({c, p: PUNCT.test(c)}));   // 标准
+  const b = [...rawUser].filter(c => !PUNCT.test(c));        // 用户(去标点)
   const ac = a.filter(x => !x.p).map(x => x.c);
   const n = ac.length, m = b.length;
   const dp = Array.from({length:n+1}, () => new Uint16Array(m+1));
   for(let i=n-1;i>=0;i--) for(let j=m-1;j>=0;j--)
     dp[i][j] = ac[i]===b[j] ? dp[i+1][j+1]+1 : Math.max(dp[i+1][j], dp[i][j+1]);
-  const hitAc = new Array(n).fill(false);
+  const hitStd = new Array(n).fill(false);   // 标准第i非标点字 是否被用户覆盖
+  const hitUser = new Array(m).fill(false);  // 用户第j字 是否被标准覆盖
   let i=0, j=0;
   while(i<n && j<m){
-    if(ac[i]===b[j]){ hitAc[i]=true; i++; j++; }
+    if(ac[i]===b[j]){ hitStd[i]=true; hitUser[j]=true; i++; j++; }
     else if(dp[i+1][j] >= dp[i][j+1]) i++;
     else j++;
   }
   const acToA = [];
   a.forEach((x,k)=>{ if(!x.p) acToA.push(k); });
-  const matched = a.map(()=>false);
-  for(let k=0;k<n;k++) if(hitAc[k]) matched[acToA[k]] = true;
-  const green = new Array(a.length).fill(false);
-  let run = 0;
+  const stdMatched = a.map(()=>false);
+  for(let k=0;k<n;k++) if(hitStd[k]) stdMatched[acToA[k]] = true;
+
+  // 连续≥2字命中 → 绿；单命中中性；未命中 → 红
+  function runs(flags){
+    const g = new Array(flags.length).fill(false);
+    let run=0;
+    for(let k=0;k<flags.length;k++){
+      if(flags[k]) run++; else run=0;
+      if(run>=2){ g[k]=true; if(k-1>=0) g[k-1]=true; }
+    }
+    return g;
+  }
+  const gStd = runs(stdMatched);
+  const gUser = runs(hitUser);
+
+  // —— 渲染“你写的”（逐字）——
+  let uh='', buf='', cls='';
+  function flushU(){ if(!buf) return;
+    if(cls==='hit') uh+=`<span class="hit">${esc(buf)}</span>`;
+    else if(cls==='miss') uh+=`<span class="miss">${esc(buf)}</span>`;
+    else uh+=esc(buf); buf=''; }
+  for(let k=0;k<m;k++){
+    if(gUser[k]){ if(cls!=='hit'){ flushU(); cls='hit'; } buf+=b[k]; }
+    else { if(cls!=='miss'){ flushU(); cls='miss'; } buf+=b[k]; }
+  }
+  flushU();
+
+  // —— 渲染“标准答案”（逐字，红＝漏写）——
+  let sh='', buf2='', cls2='';
+  function flushS(){ if(!buf2) return;
+    if(cls2==='hit') sh+=`<span class="hit">${esc(buf2)}</span>`;
+    else if(cls2==='miss') sh+=`<span class="miss">${esc(buf2)}</span>`;
+    else sh+=esc(buf2); buf2=''; }
   for(let k=0;k<a.length;k++){
-    if(matched[k]) run++; else run = 0;
-    if(run >= 2){ green[k] = true; if(k-1 >= 0) green[k-1] = true; }
+    const x=a[k];
+    if(x.p){ flushS(); sh+=esc(x.c); continue; }
+    if(gStd[k]){ if(cls2!=='hit'){ flushS(); cls2='hit'; } buf2+=x.c; }
+    else { if(cls2!=='miss'){ flushS(); cls2='miss'; } buf2+=x.c; }
   }
-  let html = '';
-  let buf = '', cls = '';
-  function flush(){
-    if(!buf) return;
-    if(cls==='hit') html += `<span class="hit">${esc(buf)}</span>`;
-    else if(cls==='miss') html += `<span class="miss">${esc(buf)}</span>`;
-    else html += esc(buf);
-    buf = '';
-  }
+  flushS();
+
   let hit=0, total=0;
-  for(let k=0;k<a.length;k++){
-    const x = a[k];
-    if(x.p){ flush(); html += esc(x.c); continue; }
-    total++;
-    if(green[k]){ if(cls!=='hit'){ flush(); cls='hit'; } buf += x.c; }
-    else if(matched[k]){ flush(); html += esc(x.c); }
-    else { if(cls!=='miss'){ flush(); cls='miss'; } buf += x.c; }
-  }
-  flush();
-  for(let k=0;k<n;k++) if(hitAc[k]) hit++;
+  for(let k=0;k<m;k++){ total++; if(hitUser[k]) hit++; }
   const pct = total ? Math.round(hit/total*100) : 0;
-  return {html:`<div class="meta">你写对约 ${hit}/${total} 字（${pct}%）；绿＝连续 2 字及以上相同，标点不计入判断、默认正确</div>`+html, hit, total};
+  const html =
+    `<div class="meta">你写对约 <b>${hit}</b>/${total} 字（${pct}%）；绿＝连续2字及以上与标准相同，红删除线＝与标准不一致/多写，标点默认正确</div>`+
+    `<div class="diff-cap">你写的：</div><div class="diff-box">${uh}</div>`+
+    `<div class="diff-cap">标准答案：</div><div class="diff-box">${sh}</div>`;
+  return {html, hit, total};
 }
 
 function computeDiff(rawUser, rawAns){
-  // 2026-08-19 升级：若标准答案可拆出 ≥2 个采分点 → 逐点判定、顺序无关
-  // （点内连续≥2字对上即整点标绿；否则整点红删除线=遗漏）
-  // 若为整句（拆不出多点）→ 退回字符级对照（连续2字标绿、标点默认正确）。
+  // 字符级对照：把你写的答案逐字与标准答案比对——
+  // 连续≥2字相同 → 标绿；不一致/多写 → 红删除线；标点不计入判断、默认正确。
+  // （不再按“整条采分点”全绿：只有真正对上的 2+ 字片段标绿，其余仍红。）
+  const charRes = diffChar(rawUser, rawAns);
   const pts = splitPoints(rawAns);
   if(pts.length >= 2){
     const unorm = normText(rawUser);
     let hit=0;
-    const rows = pts.map(p=>{
-      if(lcsLen(p.norm, unorm) >= 2){ hit++; return `<div class="qa-pt hit">${esc(p.raw)}</div>`; }
-      return `<div class="qa-pt miss">${esc(p.raw)}</div>`;
-    }).join('');
+    for(const p of pts){ if(lcsLen(p.norm, unorm) >= 2) hit++; }
     const pct = Math.round(hit/pts.length*100);
-    return {html:`<div class="meta">命中采分点 <b style="color:var(--ok)">${hit}</b>/${pts.length}（${pct}%）。绿=写对了（点内连续≥2字相同即算，顺序不限）；红删除线=遗漏</div><div style="background:var(--card);border:1px solid var(--line);border-radius:8px;padding:10px">${rows}</div>`, hit, total:pts.length};
+    const meta = `<div class="meta">采分点命中 <b style="color:var(--ok)">${hit}</b>/${pts.length}（${pct}%）｜ 下方为你写的答案逐字对照：<span style="color:var(--ok)">绿</span>=连续2字及以上与标准相同，<span style="color:var(--bad)">红删除线</span>=与标准不一致/多写，标点默认正确</div>`;
+    return {html: meta + charRes.html, hit, total: pts.length};
   }
-  return diffChar(rawUser, rawAns);
+  return charRes;
 }
 
 // 作答历史记录（每题最近 5 条；总条数超上限自动清理最旧）
@@ -1816,12 +1840,10 @@ function qa200Check(){
   const pts = qa200SplitPoints(it.a);
   if(!pts.length){ document.getElementById('qa200Result').innerHTML='<div class="empty">该答案无可拆分采分点</div>'; return; }
   let hit=0;
-  const rows = pts.map(p=>{
-    const len = qa200LcsLen(p.norm, unorm);
-    if(len>=2){ hit++; return `<div class="qa-pt hit">${esc(p.raw)}</div>`; }
-    return `<div class="qa-pt miss">${esc(p.raw)}</div>`;
-  }).join('');
+  pts.forEach(p=>{ if(qa200LcsLen(p.norm, unorm) >= 2) hit++; });
   const pct = Math.round(hit/pts.length*100);
+  // 字符级对照：显示你写的答案，逐字比对（匹配≥2字绿、不一致/多写红删除线）
+  const charRes = diffChar(user, it.a);
   // 记录作答历史 + 统计（最好成绩）
   const key=String(it.num);
   const log=prog.qa200Log[key]||(prog.qa200Log[key]=[]);
@@ -1833,8 +1855,7 @@ function qa200Check(){
   pruneLogs();
   save(); updateStats();
   document.getElementById('qa200Result').innerHTML =
-    `<div class="meta" style="margin-bottom:6px">命中采分点 <b style="color:var(--ok)">${hit}</b>/${pts.length}（${pct}%）。绿=写对了（点内连续≥2字相同即算，顺序不限）；红删除线=遗漏。</div>
-     <div style="background:var(--card);border:1px solid var(--line);border-radius:8px;padding:10px">${rows}</div>`;
+    `<div class="meta" style="margin-bottom:6px">命中采分点 <b style="color:var(--ok)">${hit}</b>/${pts.length}（${pct}%）。下方为你写的答案逐字对照：<span style="color:var(--ok)">绿</span>=连续2字及以上与标准相同，<span style="color:var(--bad)">红删除线</span>=与标准不一致/多写，标点默认正确。</div>${charRes.html}`;
   document.getElementById('qa200HistBtn').style.display='block';
   renderQA200ListBadges();
 }
