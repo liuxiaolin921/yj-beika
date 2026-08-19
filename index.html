@@ -261,8 +261,6 @@
       <span class="stat" title="三星=完全掌握">三星 <b id="sStar3">0</b></span>
       <span class="stat">案例练 <b id="sCaseRev">0</b></span>
       <span class="stat">案例掌握 <b id="sCaseOk">0</b></span>
-      <span class="stat">专题页 <b id="sTopicRead">0</b></span>
-      <span class="stat" title="专题聚焦·问答 已掌握例题数">专题问答 <b id="sTopicQA">0</b></span>
       <span class="stat" title="绿色高亮音频已听数量">音频 <b id="sAudio">0/0</b></span>
       <span class="stat" title="200问已练数量">200问 <b id="sQA200">0/0</b></span>
     </div>
@@ -274,12 +272,10 @@
       <button id="tabList" onclick="setMode('list')">题目列表</button>
       <button id="tabQA200" onclick="setMode('qa200')">200问</button>
       <button id="tabCase" onclick="setMode('case')">案例100</button>
-      <button id="tabTopic" onclick="setMode('topic')">专题聚焦</button>
       <button id="tabAudio" onclick="setMode('audio')">音频</button>
-      <button id="tabTheme" onclick="setMode('theme')">主题卡</button>
     </div>
     <button class="mini sync-btn" onclick="openSync()">🔄 同步</button>
-    <span class="ver" id="verTag" style="align-self:center;font-size:11px;color:var(--sub);margin-left:8px">v20260819-1014</span>
+    <span class="ver" id="verTag" style="align-self:center;font-size:11px;color:var(--sub);margin-left:8px">v20260819-1019</span>
   </div>
   <div class="ctrl" id="drillCtrl">
     <div class="row">
@@ -396,13 +392,7 @@
     </div>
   </div>
 
-  <!-- 主题卡 PDF -->
-  <div id="theme" style="display:none">
-    <div class="theme-wrap">
-      <div class="theme-list" id="themeList"></div>
-      <div class="theme-frame"><iframe id="themeFrame" src="about:blank"></iframe></div>
-    </div>
-  </div>
+  <!-- 主题卡 PDF（已移除） -->
 
   <!-- 案例训练 -->
   <div id="case" style="display:none">
@@ -445,52 +435,7 @@
     </div>
   </div>
 
-  <!-- 专题聚焦 -->
-  <div id="topic" style="display:none">
-    <!-- 模式切换：图片 / 问答 -->
-    <div class="topic-modebar">
-      <button id="btnTopicImg" class="mini on" onclick="topicSetMode('img')">📄 图片</button>
-      <button id="btnTopicQA" class="mini" onclick="topicSetMode('qa')">💡 问答</button>
-      <span class="topic-mode-hint" id="topicModeHint">原书扫描页，可翻页/缩放/笔记</span>
-    </div>
-    <!-- 图片模式 -->
-    <div id="topicImgMode">
-    <div class="topic-ctrl">
-      <button class="mini" onclick="topicPrev()">← 上一页</button>
-      <input type="number" id="topicPageInput" min="1" max="287" value="1" onchange="topicGoto(this.value)">
-      <span class="sep">/ <span id="topicTotal">287</span></span>
-      <button class="mini" onclick="topicNext()">下一页 →</button>
-      <button class="mini" onclick="topicRand()">随机页</button>
-      <button class="mini" onclick="topicToggleGrid()">缩略图</button>
-      <button class="mini" onclick="topicToggleZoom()">放大/还原</button>
-      <button class="mini danger" onclick="topicResetRead()">清除已读</button>
-
-    </div>
-    <div class="card">
-      <div class="crumbs" id="topicCrumbs">专题聚焦 ＞ 第 1/287 页</div>
-      <div class="topic-img-wrap">
-        <img id="topicImg" class="topic-img" src="topic/pages/p001.jpg" alt="专题聚焦第1页" onclick="topicToggleZoom()">
-      </div>
-      <div class="topic-meta" id="topicMeta">点击缩略图可快速跳转；点图片可放大查看</div>
-      <div class="topic-note">
-        <textarea id="topicNote" placeholder="此页默写/笔记（自动保存到本机）…" oninput="topicSaveNote()"></textarea>
-      </div>
-      <div class="acts">
-        <button class="btn ok" onclick="topicMarkRead()">本页已读 ✓</button>
-        <button class="btn ghost" onclick="topicPrev()">← 上一页</button>
-        <button class="btn ghost" onclick="topicNext()">下一页 →</button>
-        <button class="btn ghost" onclick="topicRand()">随机页</button>
-      </div>
-      <div class="flag" id="topicFlag"></div>
-    </div>
-    </div>
-    <!-- 问答模式：章节 → 考点 → 经典案例回顾例题 -->
-    <div id="topicQAMode" style="display:none">
-      <div class="qa-chaps" id="qaChaps"></div>
-      <div id="qaBody"></div>
-    </div>
-
-  </div>
+  <!-- 专题聚焦（已移除） -->
 
   <!-- 音频 -->
   <div id="audio" style="display:none">
@@ -649,8 +594,6 @@ function updateStats(){
   document.getElementById('sStar3').textContent=s3;
   document.getElementById('sCaseRev').textContent=Object.keys(prog.cReviewed||{}).length;
   document.getElementById('sCaseOk').textContent=Object.keys(prog.cMastered||{}).length;
-  document.getElementById('sTopicRead').textContent=Object.keys(prog.tRead||{}).length;
-  document.getElementById('sTopicQA').textContent=Object.keys(prog.tQA||{}).length;
   document.getElementById('sAudio').textContent=Object.keys(prog.tAudio||{}).length + '/' + (AUDIO_ITEMS? AUDIO_ITEMS.length : 0);
   const qa200el=document.getElementById('sQA200');
   if(qa200el) qa200el.textContent=Object.keys(prog.qa200Log||{}).length + '/' + (QA200? QA200.length : 0);
@@ -666,27 +609,19 @@ function setMode(m){
   document.getElementById('tabList').classList.toggle('on', m==='list');
   document.getElementById('tabQA200').classList.toggle('on', m==='qa200');
   document.getElementById('tabCase').classList.toggle('on', m==='case');
-  document.getElementById('tabTopic').classList.toggle('on', m==='topic');
   document.getElementById('tabAudio').classList.toggle('on', m==='audio');
-  document.getElementById('tabTheme').classList.toggle('on', m==='theme');
   const isCase = m==='case';
-  const isTopic = m==='topic';
   const isAudio = m==='audio';
-  const isTheme = m==='theme';
   const isQA200 = m==='qa200';
-  document.getElementById('drillCtrl').style.display = (isCase||isTopic||isAudio||isTheme||isQA200)?'none':'block';
+  document.getElementById('drillCtrl').style.display = (isCase||isAudio||isQA200)?'none':'block';
   document.getElementById('drill').style.display = (m==='drill')?'block':'none';
   document.getElementById('list').classList.toggle('show', m==='list');
   document.getElementById('case').style.display = isCase?'block':'none';
-  document.getElementById('topic').style.display = isTopic?'block':'none';
   document.getElementById('audio').style.display = isAudio?'block':'none';
-  document.getElementById('theme').style.display = isTheme?'block':'none';
   document.getElementById('qa200').style.display = isQA200?'block':'none';
   document.getElementById('btnBackList').style.display = (m==='drill' && _fromList) ? '' : 'none';
   if(m==='case'){ if(!CASE[caseView.idx]) caseView.idx=0; renderCase(); }
-  else if(m==='topic'){ topicRender(); }
   else if(m==='audio'){ initAudioSel(); renderAudio(); }
-  else if(m==='theme'){ themeRender(); }
   else if(m==='qa200'){ renderQA200(); }
   else if(m==='list') renderList();
   else renderCard(cur);
@@ -1485,7 +1420,6 @@ function doImport(raw, mode){
   else { prog = Object.assign({mastered:{},weak:{},reviewed:{},cMastered:{},cWeak:{},cReviewed:{},tRead:{},tNotes:{},tAudio:{},tQA:{}}, JSON.parse(JSON.stringify(imp.prog))); save(); updateStats(); toast('已覆盖导入进度'); }
   refreshSyncStat();
   if(view.mode==='case') renderCase();
-  else if(view.mode==='topic') topicRender();
   else if(view.mode==='list') renderList();
   else renderCard(cur);
 }
