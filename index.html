@@ -72,6 +72,12 @@
   .qa-pt{padding:3px 8px; border-radius:4px; margin:2px 0; font-size:14px; line-height:1.55;}
   .qa-pt.hit{color:var(--ok); background:rgba(52,199,89,.08);}
   .qa-pt.miss{color:var(--bad); text-decoration:line-through; opacity:.85; background:rgba(255,59,48,.05);}
+  .drill-log{margin-top:10px; border:1px dashed var(--line); border-radius:8px; padding:8px 10px; background:var(--card);}
+  .dlog-title{font-size:12px; color:var(--muted); margin-bottom:6px;}
+  .dlog-item{border-bottom:1px solid var(--line); padding:6px 0;}
+  .dlog-item:last-child{border-bottom:none;}
+  .dlog-u{font-size:13px; color:var(--text); white-space:pre-wrap; word-break:break-all; margin-top:2px;}
+  .qa-hist{border:1px dashed var(--line); border-radius:8px; padding:8px 10px; margin-top:8px; background:var(--card);}
   .diff .meta{font-size:13px; color:var(--sub); margin-bottom:6px; border-bottom:1px solid var(--line); padding-bottom:6px;}
   /* 操作按钮 */
   .acts{display:flex; gap:6px; margin-top:10px; flex-wrap:wrap;}
@@ -111,6 +117,7 @@
   .b-ok{background:#e3f6ec; color:var(--ok);} .b-bad{background:#fdeae6; color:var(--bad);}
   .b-star1{background:#ffe066; color:#7a5600;} .b-star2{background:#b3ece4; color:#0a6b5e;} .b-star3{background:#b7eac4; color:#15692f;}
   .b-new{background:var(--chip); color:var(--sub);}
+  .b-log{background:#e7ecff; color:#3b5bdb;}
   .empty{text-align:center; color:var(--sub); padding:40px 0; font-size:14px;}
   .pos{font-size:12px; color:var(--sub); margin:4px 0 8px; padding:3px 10px; background:var(--bg2,#f1f3f5); border-radius:8px; display:inline-block;}
   .list-count{font-size:12px; color:var(--sub); margin:6px 2px 2px; font-weight:600;}
@@ -257,6 +264,7 @@
       <span class="stat">专题页 <b id="sTopicRead">0</b></span>
       <span class="stat" title="专题聚焦·问答 已掌握例题数">专题问答 <b id="sTopicQA">0</b></span>
       <span class="stat" title="绿色高亮音频已听数量">音频 <b id="sAudio">0/0</b></span>
+      <span class="stat" title="200问已练数量">200问 <b id="sQA200">0/0</b></span>
     </div>
   </header>
 
@@ -271,7 +279,7 @@
       <button id="tabTheme" onclick="setMode('theme')">主题卡</button>
     </div>
     <button class="mini sync-btn" onclick="openSync()">🔄 同步</button>
-    <span class="ver" id="verTag" style="align-self:center;font-size:11px;color:var(--sub);margin-left:8px">v20260819-1004</span>
+    <span class="ver" id="verTag" style="align-self:center;font-size:11px;color:var(--sub);margin-left:8px">v20260819-1014</span>
   </div>
   <div class="ctrl" id="drillCtrl">
     <div class="row">
@@ -313,10 +321,12 @@
       <div class="write" id="writeBox">
         <textarea id="writeArea" placeholder="在此默写你的答案…（可选，写完点“检查”对照）"></textarea>
         <div class="diff" id="diffBox"></div>
+        <div class="drill-log" id="drillLogBox" style="display:none"></div>
       </div>
       <div class="acts">
         <button class="btn wide" id="btnAns" onclick="toggleAns()">显示答案</button>
         <button class="btn ghost wide" id="btnCheck" onclick="checkWrite()" style="display:none">检查</button>
+        <button class="btn ghost" id="btnCheck2" onclick="toggleDrillLog()" style="display:none">📋 历史作答</button>
         <button class="btn ghost" onclick="openImageCheck()">🖼️ 图片</button>
         <button class="btn ghost" onclick="prev()">← 上一张</button>
         <button class="btn ghost" onclick="randomReset()" title="清除筛选条件，全局随机抽题">🎲 随机抽</button>
@@ -354,6 +364,11 @@
     <div class="ctrl">
       <div class="row">
         <input type="text" id="qa200Query" placeholder="搜索背诵点/问题关键词…" oninput="renderQA200()">
+        <select id="qa200Only" onchange="renderQA200()" style="flex:0 0 auto">
+          <option value="all">全部</option>
+          <option value="done">已练</option>
+          <option value="todo">未练</option>
+        </select>
         <button class="mini" onclick="qa200Reset()">重置</button>
       </div>
     </div>
@@ -373,8 +388,10 @@
         <div class="row" style="margin-top:8px">
           <button class="btn" onclick="qa200Check()">检查</button>
           <button class="mini" onclick="qa200Clear()">清空重写</button>
+          <button class="mini" id="qa200HistBtn" onclick="qa200ToggleHist()" style="display:none">📋 历史作答</button>
         </div>
         <div id="qa200Result" style="margin-top:10px"></div>
+        <div id="qa200Hist" class="qa-hist" style="display:none"></div>
       </div>
     </div>
   </div>
@@ -525,7 +542,7 @@ let view = {mode:'drill', chapter:'', section:'', only:'all', skipEmpty:true, qu
 let _fromList = false;     // 当前抽背是否从「题目列表」进入（决定返回按钮是否显示）
 const scrollPos = {drill:0, list:0, case:0, topic:0, audio:0};  // 各视图滚动位置记忆
 
-function defaultProg(){ return {mastered:{},weak:{},reviewed:{},stars:{},cMastered:{},cWeak:{},cReviewed:{},tRead:{},tNotes:{},tAudio:{},tQA:{}}; }
+function defaultProg(){ return {mastered:{},weak:{},reviewed:{},stars:{},cMastered:{},cWeak:{},cReviewed:{},tRead:{},tNotes:{},tAudio:{},tQA:{},drillLog:{},qa200Log:{},qa200Stats:{}}; }
 function migrateProg(p){
   if(!p || typeof p!=='object' || Array.isArray(p)) return null;
   p.stars = p.stars || {};
@@ -635,6 +652,8 @@ function updateStats(){
   document.getElementById('sTopicRead').textContent=Object.keys(prog.tRead||{}).length;
   document.getElementById('sTopicQA').textContent=Object.keys(prog.tQA||{}).length;
   document.getElementById('sAudio').textContent=Object.keys(prog.tAudio||{}).length + '/' + (AUDIO_ITEMS? AUDIO_ITEMS.length : 0);
+  const qa200el=document.getElementById('sQA200');
+  if(qa200el) qa200el.textContent=Object.keys(prog.qa200Log||{}).length + '/' + (QA200? QA200.length : 0);
 }
 
 function setMode(m){
@@ -731,6 +750,7 @@ function renderCard(it){
     document.getElementById('ansBox').classList.remove('show'); document.getElementById('ansBody').textContent='';
     document.getElementById('writeArea').value=''; document.getElementById('diffBox').classList.remove('show');
     document.getElementById('btnAns').style.display='none'; document.getElementById('btnCheck').style.display='none';
+    document.getElementById('btnCheck2').style.display='none'; document.getElementById('drillLogBox').style.display='none';
     document.getElementById('flag').textContent=''; return; }
   document.getElementById('btnAns').style.display='block';
   document.getElementById('crumbs').innerHTML = `<b>${esc(it.chapter)}</b> ＞ ${esc(it.section)} ＞ ${esc(it.sub)}`;
@@ -741,6 +761,9 @@ function renderCard(it){
   document.getElementById('diffBox').classList.remove('show');
   document.getElementById('btnAns').textContent='显示答案';
   document.getElementById('btnCheck').style.display = (it.ans.length || (it.answer||'').length)?'block':'none';
+  const log = prog.drillLog[String(it.id)];
+  document.getElementById('btnCheck2').style.display = (log && log.length)?'block':'none';
+  updateDrillLogView();
   const st=statusOf(it.id);
   const map={
     ok:'✅ 已记住 ✓',
@@ -753,6 +776,29 @@ function renderCard(it){
   };
   document.getElementById('flag').textContent = map[st]||'';
   updateDrillPos();
+}
+
+// ===== 抽背历史作答查看 =====
+let _drillLogOpen=false;
+function updateDrillLogView(){
+  const box=document.getElementById('drillLogBox');
+  if(!cur || !box) return;
+  const log=(prog.drillLog[String(cur.id)]||[]);
+  if(!_drillLogOpen || !log.length){ box.style.display='none'; box.innerHTML=''; return; }
+  const rows=log.slice().reverse().map(e=>{
+    const dt=new Date(e.t);
+    const ts=dt.getFullYear()+'-'+String(dt.getMonth()+1).padStart(2,'0')+'-'+String(dt.getDate()).padStart(2,'0')+' '+String(dt.getHours()).padStart(2,'0')+':'+String(dt.getMinutes()).padStart(2,'0');
+    const pct=e.total?Math.round(e.hit/e.total*100):0;
+    return `<div class="dlog-item"><div class="meta">${ts} ｜ 命中 <b style="color:var(--ok)">${e.hit}</b>/${e.total}（${pct}%）</div><div class="dlog-u">${esc(e.u||'(空)')}</div></div>`;
+  }).join('');
+  box.innerHTML=`<div class="dlog-title">📋 本题历史作答（最近 ${log.length} 次）</div>${rows}`;
+  box.style.display='block';
+}
+function toggleDrillLog(){
+  _drillLogOpen=!_drillLogOpen;
+  updateDrillLogView();
+  const b=document.getElementById('btnCheck2');
+  if(b) b.textContent=_drillLogOpen?'📋 隐藏作答':'📋 历史作答';
 }
 
 function highlightText(t, q){
@@ -819,20 +865,46 @@ function next(){
   renderCard(cur); updateDrillPos();
 }
 
-function computeDiff(rawUser, rawAns){
-  // 规则（2026-08-19 调整）：
-  //  · 与标准答案「连续 2 个字及以上相同」的片段标绿（命中）；
-  //  · 标点符号（含空白、全/半角标点）不参与判断，默认正确（中性显示，既不标绿也不标红）；
-  //  · 其余未命中内容字标红（删除线＝遗漏）。
-  const PUNCT = /[　-〿＀-￯\s,.!?;:'"()\[\]<>{}_\-~`—…·、。；：？！""''（）《》〈〉【】「」『』〖〗]/;
-  // 标准答案逐字符，并记录是否标点
+// ===== 通用采分点拆分（200问 / 抽背 / 案例共用）=====
+function splitPoints(a){
+  const raw = (a||'').split(/\n+/).map(s=>s.trim()).filter(Boolean);
+  const pts=[];
+  for(const line of raw){
+    for(const seg of line.split(/[；;]/)){
+      const s = seg.trim().replace(/[。．.]$/, '').trim();
+      if(!s) continue;
+      pts.push(s);
+    }
+  }
+  const NUM = /^[（(]?\d{1,2}[)）、.．]|^[①-⑳]|^[一二三四五六七八九十]+[、.．]/;
+  const out=[]; const seen=new Set();
+  for(const rawText of pts){
+    const key = rawText.replace(NUM,'').trim();
+    const norm = key.replace(/[　\s，,。．、；;：:？！?（）()【】「」"'《》<>]/g,'');
+    if(!norm || norm.length<2) continue;
+    if(seen.has(norm)) continue;
+    seen.add(norm);
+    out.push({raw: rawText, norm});
+  }
+  return out;
+}
+const PUNCT = /[　-〿＀-￯\s,.!?;:'"()\[\]<>{}_\-~`—…·、。；：？！""''（）《》〈〉【】「」『』〖〗]/;
+function normText(s){ return (s||'').replace(PUNCT,''); }
+function lcsLen(x, y){
+  const n=x.length, m=y.length;
+  if(!n||!m) return 0;
+  const dp = Array.from({length:n+1}, ()=>new Uint16Array(m+1));
+  for(let i=n-1;i>=0;i--) for(let j=m-1;j>=0;j--)
+    dp[i][j] = x[i]===y[j] ? dp[i+1][j+1]+1 : Math.max(dp[i+1][j], dp[i][j+1]);
+  return dp[0][0];
+}
+
+// 字符级对照（整句退化路径，规则同前：连续2字标绿、标点中性）
+function diffChar(rawUser, rawAns){
   const a = [...rawAns].map(c => ({c, p: PUNCT.test(c)}));
-  // 用户答案：抽去标点后作为对照序列
   const b = [...rawUser].filter(c => !PUNCT.test(c));
-  // 标准答案的内容字序列（去标点）
   const ac = a.filter(x => !x.p).map(x => x.c);
   const n = ac.length, m = b.length;
-  // LCS：找出用户在标准答案内容字中「按顺序写对」的位置
   const dp = Array.from({length:n+1}, () => new Uint16Array(m+1));
   for(let i=n-1;i>=0;i--) for(let j=m-1;j>=0;j--)
     dp[i][j] = ac[i]===b[j] ? dp[i+1][j+1]+1 : Math.max(dp[i+1][j], dp[i][j+1]);
@@ -843,22 +915,18 @@ function computeDiff(rawUser, rawAns){
     else if(dp[i+1][j] >= dp[i][j+1]) i++;
     else j++;
   }
-  // 内容字下标 -> 原串（含标点）下标
   const acToA = [];
   a.forEach((x,k)=>{ if(!x.p) acToA.push(k); });
-  // state: 'm'=命中；其余内容字=未命中
   const matched = a.map(()=>false);
   for(let k=0;k<n;k++) if(hitAc[k]) matched[acToA[k]] = true;
-  // 连续 >=2 个命中内容字 -> 标绿；孤立单字命中保持中性（不标绿也不标红）
   const green = new Array(a.length).fill(false);
   let run = 0;
   for(let k=0;k<a.length;k++){
     if(matched[k]) run++; else run = 0;
     if(run >= 2){ green[k] = true; if(k-1 >= 0) green[k-1] = true; }
   }
-  // 渲染
   let html = '';
-  let buf = '', cls = ''; // ''=中性(标点/单命中), 'hit'=绿, 'miss'=红
+  let buf = '', cls = '';
   function flush(){
     if(!buf) return;
     if(cls==='hit') html += `<span class="hit">${esc(buf)}</span>`;
@@ -869,24 +937,67 @@ function computeDiff(rawUser, rawAns){
   let hit=0, total=0;
   for(let k=0;k<a.length;k++){
     const x = a[k];
-    if(x.p){ flush(); html += esc(x.c); continue; } // 标点：默认正确，中性
+    if(x.p){ flush(); html += esc(x.c); continue; }
     total++;
     if(green[k]){ if(cls!=='hit'){ flush(); cls='hit'; } buf += x.c; }
-    else if(matched[k]){ flush(); html += esc(x.c); }   // 孤立单字命中：中性
-    else { if(cls!=='miss'){ flush(); cls='miss'; } buf += x.c; } // 遗漏：红
+    else if(matched[k]){ flush(); html += esc(x.c); }
+    else { if(cls!=='miss'){ flush(); cls='miss'; } buf += x.c; }
   }
   flush();
   for(let k=0;k<n;k++) if(hitAc[k]) hit++;
   const pct = total ? Math.round(hit/total*100) : 0;
-  return {html:`<div class="meta">你写对约 ${hit}/${total} 字（${pct}%）；绿＝连续 2 字及以上相同，标点不计入判断、默认正确</div>`+html, hitChars:hit, totalChars:total};
+  return {html:`<div class="meta">你写对约 ${hit}/${total} 字（${pct}%）；绿＝连续 2 字及以上相同，标点不计入判断、默认正确</div>`+html, hit, total};
+}
+
+function computeDiff(rawUser, rawAns){
+  // 2026-08-19 升级：若标准答案可拆出 ≥2 个采分点 → 逐点判定、顺序无关
+  // （点内连续≥2字对上即整点标绿；否则整点红删除线=遗漏）
+  // 若为整句（拆不出多点）→ 退回字符级对照（连续2字标绿、标点默认正确）。
+  const pts = splitPoints(rawAns);
+  if(pts.length >= 2){
+    const unorm = normText(rawUser);
+    let hit=0;
+    const rows = pts.map(p=>{
+      if(lcsLen(p.norm, unorm) >= 2){ hit++; return `<div class="qa-pt hit">${esc(p.raw)}</div>`; }
+      return `<div class="qa-pt miss">${esc(p.raw)}</div>`;
+    }).join('');
+    const pct = Math.round(hit/pts.length*100);
+    return {html:`<div class="meta">命中采分点 <b style="color:var(--ok)">${hit}</b>/${pts.length}（${pct}%）。绿=写对了（点内连续≥2字相同即算，顺序不限）；红删除线=遗漏</div><div style="background:var(--card);border:1px solid var(--line);border-radius:8px;padding:10px">${rows}</div>`, hit, total:pts.length};
+  }
+  return diffChar(rawUser, rawAns);
+}
+
+// 作答历史记录（每题最近 5 条；总条数超上限自动清理最旧）
+const LOG_MAX_PER_Q = 5, LOG_MAX_TOTAL = 3000;
+function pushLog(log, key, entry){
+  const arr = log[key] || (log[key]=[]);
+  arr.push(entry);
+  if(arr.length > LOG_MAX_PER_Q) arr.shift();
+}
+function pruneLogs(){
+  const all=[];
+  ['drillLog','qa200Log'].forEach(f=>{
+    Object.keys(prog[f]||{}).forEach(k=>{
+      (prog[f][k]||[]).forEach(e=>all.push({f,k,t:e.t}));
+    });
+  });
+  if(all.length > LOG_MAX_TOTAL){
+    all.sort((a,b)=>a.t-b.t);
+    const drop = all.length - LOG_MAX_TOTAL;
+    const dropped = new Set(all.slice(0, drop).map(x=>x.f+'\u0000'+x.k));
+    dropped.forEach(k=>{ const [f,key]=k.split('\u0000'); const arr=prog[f][key]; if(arr && arr.length){ prog[f][key]=arr.slice(-LOG_MAX_PER_Q); if(!prog[f][key].length) delete prog[f][key]; } });
+  }
 }
 
 function checkWrite(){
   if(!cur || !cur.ans.length){ toast('此题无答案可对照'); return; }
-  const {html}=computeDiff(document.getElementById('writeArea').value, cur.answer||'');
+  const val=document.getElementById('writeArea').value;
+  const r=computeDiff(val, cur.answer||'');
   const diff=document.getElementById('diffBox');
-  diff.innerHTML=html; diff.classList.add('show');
-  prog.reviewed[cur.id]=Date.now(); save(); updateStats();
+  diff.innerHTML=r.html; diff.classList.add('show');
+  pushLog(prog.drillLog, String(cur.id), {t:Date.now(), u:val, hit:r.hit, total:r.total});
+  pruneLogs();
+  prog.reviewed[cur.id]=Date.now(); save(); updateStats(); updateDrillLogView();
 }
 
 // ===== 图片OCR答案检查 =====
@@ -931,12 +1042,14 @@ function doImageCheck(){
   if(!cur || !cur.ans.length){ toast('此题无答案可对照'); return; }
   const text = document.getElementById('imgOcrText').value;
   if(!text.trim()){ toast('请先在“识别文字”框里粘贴或输入识别结果'); return; }
-  const {html}=computeDiff(text, cur.answer||'');
+  const r=computeDiff(text, cur.answer||'');
   const diff=document.getElementById('diffBox');
-  diff.innerHTML=html; diff.classList.add('show');
+  diff.innerHTML=r.html; diff.classList.add('show');
   document.getElementById('writeArea').value = text;
   closeImageCheck();
-  prog.reviewed[cur.id]=Date.now(); save(); updateStats();
+  pushLog(prog.drillLog, String(cur.id), {t:Date.now(), u:text, hit:r.hit, total:r.total});
+  pruneLogs();
+  prog.reviewed[cur.id]=Date.now(); save(); updateStats(); updateDrillLogView();
   toast('已用图片识别结果检查');
 }
 
@@ -981,8 +1094,10 @@ function renderList(){
     else if(prog.reviewed[it.id]) b='<span class="badge b-new">已学</span>';
     else b='<span class="badge b-new">新</span>';
     const cb = it.cat ? `<span class="badge b-cat-${catClass(it.cat)}">${esc(it.cat)}</span>` : '';
+    const lg = prog.drillLog[String(it.id)];
+    const lb = (lg && lg.length) ? `<span class="badge b-log">练${lg.length}</span>` : '';
     const qn2 = it.num ? `<span class="qnum">${esc(it.num)}</span>` : '';
-    return `<div class="li" onclick="openFromList(${it.id})">${cb}${b}${qn2}<div class="qt">${esc(it.title)}</div><div class="meta">${esc(it.chapter)} ＞ ${esc(it.sub)}</div></div>`;
+    return `<div class="li" onclick="openFromList(${it.id})">${cb}${b}${lb}${qn2}<div class="qt">${esc(it.title)}</div><div class="meta">${esc(it.chapter)} ＞ ${esc(it.sub)}</div></div>`;
   }).join('');
 }
 function openFromList(id){
@@ -1275,6 +1390,20 @@ function mergeProg(loc, rem){
     const a=loc[f]||{}, b=rem[f]||{}, o=out[f]||(out[f]={});
     for(const k in b){ if(!(k in a) || (b[k]||0) > (a[k]||0)) o[k]=b[k]; }
   });
+  // 作答历史：取两端并集（每端各保留最近5条，合并后截断）
+  ['drillLog','qa200Log','qa200Stats'].forEach(f=>{
+    const a=loc[f]||{}, b=rem[f]||{}, o=out[f]||(out[f]={});
+    const keys=new Set(Object.keys(a).concat(Object.keys(b)));
+    keys.forEach(k=>{
+      if(f==='qa200Stats'){
+        const av=a[k]||{}, bv=b[k]||{};
+        o[k]={times:Math.max(av.times||0,bv.times||0), best:Math.max(av.best||0,bv.best||0), total:bv.total||av.total||0, bestT:(bv.bestT||0)>(av.bestT||0)?bv.bestT:av.bestT};
+      } else {
+        const arr=(a[k]||[]).concat(b[k]||[]).sort((x,y)=>(x.t||0)-(y.t||0)).slice(-LOG_MAX_PER_Q);
+        if(arr.length) o[k]=arr;
+      }
+    });
+  });
   out.tNotes = Object.assign({}, loc.tNotes||{}, rem.tNotes||{});
   return out;
 }
@@ -1547,29 +1676,39 @@ function audioStopAll(){ if(audioEl) audioEl.pause(); audioPL=[]; audioIdx=-1; t
 function cssEscape(s){ return (window.CSS&&CSS.escape)?CSS.escape(s):s.replace(/["\\]/g,'\\$&'); }
 
 // ===== 200问（龙炎飞必背200问 · 问答默写）=====
-let qa200View = { query:'', idx:0, inDetail:false };
+let qa200View = { query:'', only:'all', idx:0, inDetail:false, histOpen:false };
 function qa200Filtered(){
   const q=(qa200View.query||'').trim().toLowerCase();
   let arr = QA200 || [];
   if(q) arr = arr.filter(it => (it.q||'').toLowerCase().includes(q) || String(it.num).includes(q));
+  if(qa200View.only==='done') arr = arr.filter(it => (prog.qa200Log[String(it.num)]||[]).length>0);
+  else if(qa200View.only==='todo') arr = arr.filter(it => !(prog.qa200Log[String(it.num)]||[]).length);
   return arr;
 }
 function renderQA200(){
   const arr = qa200Filtered();
-  document.getElementById('qa200Count').innerHTML = `共 <b>${arr.length}</b> 问` + (qa200View.query?'（已按关键词筛选）':'');
+  const doneCnt = Object.keys(prog.qa200Log||{}).length;
+  document.getElementById('qa200Count').innerHTML = `共 <b>${arr.length}</b> 问` + (qa200View.query?'（已按关键词筛选）':'') + ` ｜ 已练 <b style="color:var(--ok)">${doneCnt}</b>/207`;
   const box = document.getElementById('qa200List');
   if(!arr.length){ box.innerHTML='<div class="empty">没有匹配的背诵点</div>'; return; }
   box.innerHTML = arr.map(it=>{
+    const log = prog.qa200Log[String(it.num)];
+    const st = prog.qa200Stats[String(it.num)];
+    let badge = '';
+    if(log && log.length) badge = `<span class="badge b-log">练${log.length}</span>`;
+    else badge = `<span class="badge b-new">未练</span>`;
+    const best = st && st.best!==undefined ? `<span class="badge b-star2">最好${st.best}/${st.total||'?'}</span>` : '';
     const pg = it.page?` <span class="meta" style="float:right;color:var(--muted)">P${it.page}</span>`:'';
-    return `<div class="li" onclick="qa200Open(${it.num})"><span class="qnum">${it.num}.</span> <span class="qt">${esc(it.q)}</span>${pg}</div>`;
+    return `<div class="li" onclick="qa200Open(${it.num})">${badge}${best}<span class="qnum">${it.num}.</span> <span class="qt">${esc(it.q)}</span>${pg}</div>`;
   }).join('');
   if(qa200View.inDetail) qa200ShowDetail(qa200View.idx);
 }
-function qa200Reset(){ qa200View.query=''; qa200View.inDetail=false; document.getElementById('qa200Query').value=''; renderQA200(); }
+function qa200Reset(){ qa200View.query=''; qa200View.only='all'; qa200View.inDetail=false; qa200View.histOpen=false; document.getElementById('qa200Query').value=''; document.getElementById('qa200Only').value='all'; renderQA200(); }
 function qa200Open(num){
   qa200View.idx = (QA200||[]).findIndex(it=>it.num===num);
   if(qa200View.idx<0) return;
   qa200View.inDetail = true;
+  qa200View.histOpen = false;
   qa200ShowDetail(qa200View.idx);
   window.scrollTo({top:0, behavior:'smooth'});
 }
@@ -1582,6 +1721,10 @@ function qa200ShowDetail(idx){
   const pg = it.page?` <span class="meta">（教材 P${it.page}）</span>`:'';
   document.getElementById('qa200Q').innerHTML = `<span class="qnum">背诵点${it.num}</span>　${esc(it.q)}${pg}`;
   document.getElementById('qa200Result').innerHTML='';
+  const log = prog.qa200Log[String(it.num)]||[];
+  document.getElementById('qa200HistBtn').style.display = log.length?'block':'none';
+  document.getElementById('qa200Hist').style.display='none';
+  qa200View.histOpen=false;
   const inArr = arr.findIndex(x=>x.num===it.num);
   document.getElementById('qa200Prev').style.visibility = (inArr>0)?'visible':'hidden';
   document.getElementById('qa200Next').style.visibility = (inArr>=0 && inArr<arr.length-1)?'visible':'hidden';
@@ -1602,6 +1745,25 @@ function qa200Nav(step){
   qa200ShowDetail(qa200View.idx);
 }
 function qa200Clear(){ document.getElementById('qa200Input').value=''; document.getElementById('qa200Result').innerHTML=''; }
+function qa200HistRows(){
+  const it=QA200[qa200View.idx];
+  if(!it) return '';
+  const log=(prog.qa200Log[String(it.num)]||[]);
+  if(!log.length) return '<div class="empty">本题暂无作答记录</div>';
+  return log.slice().reverse().map(e=>{
+    const dt=new Date(e.t);
+    const ts=dt.getFullYear()+'-'+String(dt.getMonth()+1).padStart(2,'0')+'-'+String(dt.getDate()).padStart(2,'0')+' '+String(dt.getHours()).padStart(2,'0')+':'+String(dt.getMinutes()).padStart(2,'0');
+    const pct=e.total?Math.round(e.hit/e.total*100):0;
+    return `<div class="dlog-item"><div class="meta">${ts} ｜ 命中 <b style="color:var(--ok)">${e.hit}</b>/${e.total}（${pct}%）</div><div class="dlog-u">${esc(e.u||'(空)')}</div></div>`;
+  }).join('');
+}
+function qa200ToggleHist(){
+  qa200View.histOpen=!qa200View.histOpen;
+  const box=document.getElementById('qa200Hist');
+  const btn=document.getElementById('qa200HistBtn');
+  if(qa200View.histOpen){ box.innerHTML=`<div class="dlog-title">📋 本题历史作答（最近 ${(prog.qa200Log[String(QA200[qa200View.idx].num)]||[]).length} 次）</div>`+qa200HistRows(); box.style.display='block'; btn.textContent='📋 隐藏作答'; }
+  else { box.style.display='none'; btn.textContent='📋 历史作答'; }
+}
 // 采分点拆分：按行/分号拆，剥离 （1） 1. ①② 等序号前缀，去空去重
 function qa200SplitPoints(a){
   const raw = (a||'').split(/\n+/).map(s=>s.trim()).filter(Boolean);
@@ -1650,9 +1812,25 @@ function qa200Check(){
     return `<div class="qa-pt miss">${esc(p.raw)}</div>`;
   }).join('');
   const pct = Math.round(hit/pts.length*100);
+  // 记录作答历史 + 统计（最好成绩）
+  const key=String(it.num);
+  const log=prog.qa200Log[key]||(prog.qa200Log[key]=[]);
+  log.push({t:Date.now(), u:user, hit, total:pts.length});
+  if(log.length>5) log.shift();
+  const st=prog.qa200Stats[key]||(prog.qa200Stats[key]={});
+  st.times=(st.times||0)+1;
+  if(!st.best || hit>st.best){ st.best=hit; st.total=pts.length; st.bestT=Date.now(); }
+  pruneLogs();
+  save(); updateStats();
   document.getElementById('qa200Result').innerHTML =
     `<div class="meta" style="margin-bottom:6px">命中采分点 <b style="color:var(--ok)">${hit}</b>/${pts.length}（${pct}%）。绿=写对了（点内连续≥2字相同即算，顺序不限）；红删除线=遗漏。</div>
      <div style="background:var(--card);border:1px solid var(--line);border-radius:8px;padding:10px">${rows}</div>`;
+  document.getElementById('qa200HistBtn').style.display='block';
+  renderQA200ListBadges();
+}
+function renderQA200ListBadges(){
+  const box=document.getElementById('qa200List');
+  if(box && box.style.display!=='none') renderQA200();
 }
 
 // 初始化
