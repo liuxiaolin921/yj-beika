@@ -262,7 +262,7 @@
       <span class="stat">案例练 <b id="sCaseRev">0</b></span>
       <span class="stat">案例掌握 <b id="sCaseOk">0</b></span>
       <span class="stat" title="绿色高亮音频已听数量">音频 <b id="sAudio">0/0</b></span>
-      <span class="stat" title="200问已练数量">200问 <b id="sQA200">0/0</b></span>
+      <span class="stat" title="200问抽背已评数量">200问(评) <b id="sQA200">0/0</b></span>
     </div>
   </header>
 
@@ -275,7 +275,7 @@
       <button id="tabAudio" onclick="setMode('audio')">音频</button>
     </div>
     <button class="mini sync-btn" onclick="openSync()">🔄 同步</button>
-    <span class="ver" id="verTag" style="align-self:center;font-size:11px;color:var(--sub);margin-left:8px">v20260819-1212</span>
+    <span class="ver" id="verTag" style="align-self:center;font-size:11px;color:var(--sub);margin-left:8px">v20260819-1304</span>
   </div>
   <div class="ctrl" id="drillCtrl">
     <div class="row">
@@ -366,10 +366,13 @@
           <option value="todo">未练</option>
         </select>
         <button class="mini" onclick="qa200Reset()">重置</button>
+        <span style="flex:1"></span>
+        <button class="mini" id="qa200ModeDrill" onclick="qa200SetMode('drill')">抽背</button>
+        <button class="mini" id="qa200ModeWrite" onclick="qa200SetMode('write')">默写</button>
       </div>
     </div>
     <div class="tcount" id="qa200Count"></div>
-    <div id="qa200List" class="list" style="margin-bottom:12px"></div>
+    <div id="qa200List" class="list show" style="margin-bottom:12px"></div>
     <div id="qa200Detail" style="display:none">
       <div class="ctrl">
         <div class="row">
@@ -380,11 +383,28 @@
       </div>
       <div class="card">
         <div class="qh" id="qa200Q"></div>
-        <textarea id="qa200Input" rows="7" placeholder="在此默写答案：写要点即可、顺序不限，写完点「检查」。" style="width:100%;box-sizing:border-box;font-size:14px;line-height:1.6"></textarea>
-        <div class="row" style="margin-top:8px">
-          <button class="btn" onclick="qa200Check()">检查</button>
-          <button class="mini" onclick="qa200Clear()">清空重写</button>
-          <button class="mini" id="qa200HistBtn" onclick="qa200ToggleHist()" style="display:none">📋 历史作答</button>
+        <!-- 抽背模式：显示答案 + 自评记住/星级 -->
+        <div id="qa200Drill" style="display:none">
+          <div class="row" style="margin-top:8px">
+            <button class="btn" id="qa200Reveal" onclick="qa200Reveal()">显示答案</button>
+          </div>
+          <div id="qa200Answer" style="display:none;margin-top:10px"></div>
+          <div id="qa200Rate" class="row" style="margin-top:10px;display:none;gap:6px;flex-wrap:wrap">
+            <button class="mini" id="qa200RateOk" onclick="qa200Rate('ok')">✅ 记住了</button>
+            <button class="mini" id="qa200RateS3" onclick="qa200Rate('star3')">⭐⭐⭐</button>
+            <button class="mini" id="qa200RateS2" onclick="qa200Rate('star2')">⭐⭐</button>
+            <button class="mini" id="qa200RateS1" onclick="qa200Rate('star1')">⭐</button>
+            <button class="mini" id="qa200RateBad" onclick="qa200Rate('bad')">⚠️ 没记住</button>
+          </div>
+        </div>
+        <!-- 默写模式：写要点 + 检查 -->
+        <div id="qa200Write">
+          <textarea id="qa200Input" rows="7" placeholder="在此默写答案：写要点即可、顺序不限，写完点「检查」。" style="width:100%;box-sizing:border-box;font-size:14px;line-height:1.6"></textarea>
+          <div class="row" style="margin-top:8px">
+            <button class="btn" onclick="qa200Check()">检查</button>
+            <button class="mini" onclick="qa200Clear()">清空重写</button>
+            <button class="mini" id="qa200HistBtn" onclick="qa200ToggleHist()" style="display:none">📋 历史作答</button>
+          </div>
         </div>
         <div id="qa200Result" style="margin-top:10px"></div>
         <div id="qa200Hist" class="qa-hist" style="display:none"></div>
@@ -487,7 +507,7 @@ let view = {mode:'drill', chapter:'', section:'', only:'all', skipEmpty:true, qu
 let _fromList = false;     // 当前抽背是否从「题目列表」进入（决定返回按钮是否显示）
 const scrollPos = {drill:0, list:0, case:0, topic:0, audio:0};  // 各视图滚动位置记忆
 
-function defaultProg(){ return {mastered:{},weak:{},reviewed:{},stars:{},cMastered:{},cWeak:{},cReviewed:{},tRead:{},tNotes:{},tAudio:{},tQA:{},drillLog:{},qa200Log:{},qa200Stats:{}}; }
+function defaultProg(){ return {mastered:{},weak:{},reviewed:{},stars:{},cMastered:{},cWeak:{},cReviewed:{},tRead:{},tNotes:{},tAudio:{},tQA:{},drillLog:{},qa200Log:{},qa200Stats:{},qa200Stars:{}}; }
 function migrateProg(p){
   if(!p || typeof p!=='object' || Array.isArray(p)) return null;
   p.stars = p.stars || {};
@@ -596,7 +616,7 @@ function updateStats(){
   document.getElementById('sCaseOk').textContent=Object.keys(prog.cMastered||{}).length;
   document.getElementById('sAudio').textContent=Object.keys(prog.tAudio||{}).length + '/' + (AUDIO_ITEMS? AUDIO_ITEMS.length : 0);
   const qa200el=document.getElementById('sQA200');
-  if(qa200el) qa200el.textContent=Object.keys(prog.qa200Log||{}).length + '/' + (QA200? QA200.length : 0);
+  if(qa200el) qa200el.textContent=Object.keys(prog.qa200Stars||{}).length + '/' + (QA200? QA200.length : 0);
 }
 
 function setMode(m){
@@ -622,7 +642,7 @@ function setMode(m){
   document.getElementById('btnBackList').style.display = (m==='drill' && _fromList) ? '' : 'none';
   if(m==='case'){ if(!CASE[caseView.idx]) caseView.idx=0; renderCase(); }
   else if(m==='audio'){ initAudioSel(); renderAudio(); }
-  else if(m==='qa200'){ renderQA200(); }
+  else if(m==='qa200'){ renderQA200(); document.getElementById('qa200ModeDrill').classList.toggle('on', qa200View.mode==='drill'); document.getElementById('qa200ModeWrite').classList.toggle('on', qa200View.mode==='write'); }
   else if(m==='list') renderList();
   else renderCard(cur);
   // 抽背视图回到顶部；其余浏览视图还原上次滚动位置
@@ -1328,6 +1348,9 @@ function mergeProg(loc, rem){
     const a=loc[f]||{}, b=rem[f]||{}, o=out[f]||(out[f]={});
     for(const k in b){ if(!(k in a) || (b[k]||0) > (a[k]||0)) o[k]=b[k]; }
   });
+  // 200问抽背自评（字符串评级，远端有而本地无则采用）
+  { const f='qa200Stars'; const a=loc[f]||{}, b=rem[f]||{}, o=out[f]||(out[f]={});
+    for(const k in b){ if(!(k in a)) o[k]=b[k]; } }
   // 作答历史：取两端并集（每端各保留最近5条，合并后截断）
   ['drillLog','qa200Log','qa200Stats'].forEach(f=>{
     const a=loc[f]||{}, b=rem[f]||{}, o=out[f]||(out[f]={});
@@ -1613,7 +1636,7 @@ function audioStopAll(){ if(audioEl) audioEl.pause(); audioPL=[]; audioIdx=-1; t
 function cssEscape(s){ return (window.CSS&&CSS.escape)?CSS.escape(s):s.replace(/["\\]/g,'\\$&'); }
 
 // ===== 200问（龙炎飞必背200问 · 问答默写）=====
-let qa200View = { query:'', only:'all', idx:0, inDetail:false, histOpen:false };
+let qa200View = { query:'', only:'all', idx:0, inDetail:false, histOpen:false, mode:'drill' };
 function qa200Filtered(){
   const q=(qa200View.query||'').trim().toLowerCase();
   let arr = QA200 || [];
@@ -1625,7 +1648,7 @@ function qa200Filtered(){
 function renderQA200(){
   const arr = qa200Filtered();
   const doneCnt = Object.keys(prog.qa200Log||{}).length;
-  document.getElementById('qa200Count').innerHTML = `共 <b>${arr.length}</b> 问` + (qa200View.query?'（已按关键词筛选）':'') + ` ｜ 已练 <b style="color:var(--ok)">${doneCnt}</b>/207`;
+  document.getElementById('qa200Count').innerHTML = `共 <b>${arr.length}</b> 问` + (qa200View.query?'（已按关键词筛选）':'') + ` ｜ 已评 <b style="color:var(--ok)">${Object.keys(prog.qa200Stars||{}).length}</b>/${QA200.length} ｜ 已练 <b>${doneCnt}</b>`;
   const box = document.getElementById('qa200List');
   if(!arr.length){ box.innerHTML='<div class="empty">没有匹配的背诵点</div>'; return; }
   box.innerHTML = arr.map(it=>{
@@ -1636,7 +1659,10 @@ function renderQA200(){
     else badge = `<span class="badge b-new">未练</span>`;
     const best = st && st.best!==undefined ? `<span class="badge b-star2">最好${st.best}/${st.total||'?'}</span>` : '';
     const pg = it.page?` <span class="meta" style="float:right;color:var(--muted)">P${it.page}</span>`:'';
-    return `<div class="li" onclick="qa200Open(${it.num})">${badge}${best}<span class="qnum">${it.num}.</span> <span class="qt">${esc(it.q)}</span>${pg}</div>`;
+    const rate = prog.qa200Stars[String(it.num)];
+    const rateTxt = {ok:'已记',star3:'★★★',star2:'★★',star1:'★',bad:'未记'}[rate];
+    const rateBadge = rate ? `<span class="badge b-star2">${rateTxt}</span>` : '';
+    return `<div class="li" onclick="qa200Open(${it.num})">${rateBadge}${badge}${best}<span class="qnum">${it.num}.</span> <span class="qt">${esc(it.q)}</span>${pg}</div>`;
   }).join('');
   if(qa200View.inDetail) qa200ShowDetail(qa200View.idx);
 }
@@ -1653,22 +1679,69 @@ function qa200ShowDetail(idx){
   const arr = qa200Filtered();
   const it = QA200[qa200View.idx];
   if(!it) return;
-  document.getElementById('qa200List').style.display='none';
+  const lb=document.getElementById('qa200List');
+  lb.classList.remove('show'); lb.style.display='none';
   document.getElementById('qa200Detail').style.display='block';
   const pg = it.page?` <span class="meta">（教材 P${it.page}）</span>`:'';
-  document.getElementById('qa200Q').innerHTML = `<span class="qnum">背诵点${it.num}</span>　${esc(it.q)}${pg}`;
-  document.getElementById('qa200Result').innerHTML='';
-  const log = prog.qa200Log[String(it.num)]||[];
-  document.getElementById('qa200HistBtn').style.display = log.length?'block':'none';
-  document.getElementById('qa200Hist').style.display='none';
+  const pos = `（${idx+1}/${QA200.length}）`;
+  document.getElementById('qa200Q').innerHTML = `<span class="qnum">背诵点${it.num}</span> <span class="meta">${pos}</span>　${esc(it.q)}${pg}`;
+  const isDrill = qa200View.mode==='drill';
+  document.getElementById('qa200Drill').style.display = isDrill?'block':'none';
+  document.getElementById('qa200Write').style.display = isDrill?'none':'block';
+  if(isDrill){
+    document.getElementById('qa200Answer').style.display='none';
+    document.getElementById('qa200Rate').style.display='none';
+    document.getElementById('qa200Reveal').style.display='block';
+    document.getElementById('qa200Result').innerHTML='';
+  } else {
+    document.getElementById('qa200Input').value='';
+    document.getElementById('qa200Result').innerHTML='';
+    const log = prog.qa200Log[String(it.num)]||[];
+    document.getElementById('qa200HistBtn').style.display = log.length?'block':'none';
+    document.getElementById('qa200Hist').style.display='none';
+  }
   qa200View.histOpen=false;
   const inArr = arr.findIndex(x=>x.num===it.num);
   document.getElementById('qa200Prev').style.visibility = (inArr>0)?'visible':'hidden';
   document.getElementById('qa200Next').style.visibility = (inArr>=0 && inArr<arr.length-1)?'visible':'hidden';
+  qa200ApplyRateUI(it.num);
+}
+// 抽背/默写模式切换
+function qa200SetMode(m){
+  qa200View.mode = m;
+  document.getElementById('qa200ModeDrill').classList.toggle('on', m==='drill');
+  document.getElementById('qa200ModeWrite').classList.toggle('on', m==='write');
+  if(qa200View.inDetail) qa200ShowDetail(qa200View.idx);
+}
+// 抽背：显示标准答案
+function qa200Reveal(){
+  const it = QA200[qa200View.idx];
+  if(!it) return;
+  document.getElementById('qa200Answer').innerHTML = fmtAns(it.a, '');
+  document.getElementById('qa200Answer').style.display='block';
+  document.getElementById('qa200Reveal').style.display='none';
+  document.getElementById('qa200Rate').style.display='flex';
+  qa200ApplyRateUI(it.num);
+}
+// 抽背：自评（记住了/星级/没记住），写入 qa200Stars 并同步
+function qa200Rate(level){
+  const it = QA200[qa200View.idx];
+  if(!it) return;
+  const key=String(it.num);
+  prog.qa200Stars[key]=level;
+  save(); updateStats();
+  qa200ApplyRateUI(it.num);
+  const map={ok:'✅ 已标记：记住了',star3:'⭐⭐⭐ 三星（很熟练）',star2:'⭐⭐ 二星（较熟练）',star1:'⭐ 一星（基本记得）',bad:'⚠️ 已标记：没记住'};
+  toast(map[level]||'已记录');
+}
+function qa200ApplyRateUI(num){
+  const lv = prog.qa200Stars[String(num)];
+  const ids={ok:'qa200RateOk',star3:'qa200RateS3',star2:'qa200RateS2',star1:'qa200RateS1',bad:'qa200RateBad'};
+  Object.keys(ids).forEach(k=>{ const b=document.getElementById(ids[k]); if(b) b.classList.toggle('on', lv===k); });
 }
 function qa200Back(){
   qa200View.inDetail=false;
-  document.getElementById('qa200List').style.display='';
+  const lb=document.getElementById('qa200List'); lb.classList.add('show'); lb.style.display='';
   document.getElementById('qa200Detail').style.display='none';
   renderQA200();
   window.scrollTo({top:0, behavior:'smooth'});
