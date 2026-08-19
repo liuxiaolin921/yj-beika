@@ -285,7 +285,7 @@
       <button id="tabAudio" onclick="setMode('audio')">音频</button>
     </div>
     <button class="mini sync-btn" onclick="openSync()">🔄 同步</button>
-    <span class="ver" id="verTag" style="align-self:center;font-size:11px;color:var(--sub);margin-left:8px">v20260820-0900</span>
+    <span class="ver" id="verTag" style="align-self:center;font-size:11px;color:var(--sub);margin-left:8px">v20260820-0931</span>
   </div>
   <div class="ctrl" id="drillCtrl">
     <div class="row">
@@ -1923,6 +1923,63 @@ function diffChar(rawUser, rawAns){
   return {html, hit, total};
 }
 
+// 按用户得分点拆分：以换行、顿号、逗号、分号、句号作为分割符号
+function splitUserPoints(a){
+  const raw = (a||'').split(/[\n，,、；;。．.]+/).map(s=>s.trim()).filter(Boolean);
+  const NUM = /^[（(]?\d{1,2}[)）、.．]|^[①-⑳]|^[一二三四五六七八九十]+[、.．]/;
+  const out=[];
+  for(const r of raw){
+    const key = r.replace(NUM,'').trim();
+    const norm = key.replace(/[　\s，,。．、；;：:？！?（）()【】「」"'《》<>]/g,'');
+    if(!norm || norm.length<2) continue;
+    out.push({raw: key, norm});
+  }
+  return out;
+}
+
+// 按用户得分点整体对照：把用户答案按标点/换行拆成得分点，每个得分点去标准答案中找最佳匹配
+// 连续≥2字相同即认为该得分点命中，整条得分点标绿；未命中整条标红删除线；标准答案中未被命中的点标红删除线
+function diffByPoints(rawUser, rawAns){
+  const userPts = splitUserPoints(rawUser);
+  const ansPts = splitUserPoints(rawAns); // 标准答案同样按换行/顿号/逗号/分号/句号拆分成得分点
+  const matchedAns = new Set();
+  let userHtml = '';
+  let hit = 0;
+
+  for(const up of userPts){
+    let bestIdx = -1;
+    let bestLen = 0;
+    for(let i=0;i<ansPts.length;i++){
+      const len = lcsLen(up.norm, ansPts[i].norm);
+      if(len >= 2 && len > bestLen){ bestIdx = i; bestLen = len; }
+    }
+    if(bestIdx >= 0){
+      matchedAns.add(bestIdx);
+      hit++;
+      userHtml += `<span class="hit">${esc(up.raw)}</span>`;
+    } else {
+      userHtml += `<span class="miss">${esc(up.raw)}</span>`;
+    }
+    userHtml += '、';
+  }
+  userHtml = userHtml.replace(/、$/,'');
+
+  let ansHtml = '';
+  for(let i=0;i<ansPts.length;i++){
+    if(matchedAns.has(i)) ansHtml += `<span class="hit">${esc(ansPts[i].raw)}</span>`;
+    else ansHtml += `<span class="miss">${esc(ansPts[i].raw)}</span>`;
+    ansHtml += '、';
+  }
+  ansHtml = ansHtml.replace(/、$/,'');
+
+  const total = ansPts.length;
+  const pct = total ? Math.round(hit/total*100) : 0;
+  const html =
+    `<div class="diff-cap">你写的：</div><div class="diff-box">${userHtml}</div>`+
+    `<div class="diff-cap">标准答案：</div><div class="diff-box">${ansHtml}</div>`;
+  return {html, hit, total};
+}
+
 function computeDiff(rawUser, rawAns){
   // 字符级对照：把你写的答案逐字与标准答案比对——
   // 连续≥2字相同 → 标绿；不一致/多写 → 红删除线；标点不计入判断、默认正确。
@@ -2881,8 +2938,8 @@ function qa200Check(){
   let hit=0;
   pts.forEach(p=>{ if(qa200LcsLen(p.norm, unorm) >= 2) hit++; });
   const pct = Math.round(hit/pts.length*100);
-  // 字符级对照：显示你写的答案，逐字比对（匹配≥2字绿、不一致/多写红删除线）
-  const charRes = diffChar(user, it.a);
+  // 按用户得分点整体对照：以标点/换行拆分，每个得分点与标准答案最佳匹配，命中则整条绿，未命中整条红删除线
+  const pointRes = diffByPoints(user, it.a);
   // 记录作答历史 + 统计（最好成绩）
   const key=String(it.num);
   if(user && user.trim()) prog.qa200Answers[key]=user; else delete prog.qa200Answers[key];
@@ -2895,7 +2952,7 @@ function qa200Check(){
   pruneLogs();
   save(); updateStats();
   document.getElementById('qa200Result').innerHTML =
-    `<div class="meta" style="margin-bottom:6px">命中采分点 <b style="color:var(--ok)">${hit}</b>/${pts.length}（${pct}%）。下方为你写的答案逐字对照：<span style="color:var(--ok)">绿</span>=连续2字及以上与标准相同，<span style="color:var(--bad)">红删除线</span>=与标准不一致/多写，标点默认正确。</div>${charRes.html}`;
+    `<div class="meta" style="margin-bottom:6px">命中采分点 <b style="color:var(--ok)">${hit}</b>/${pts.length}（${pct}%）。下方按你写的每条得分点整体对照：<span style="color:var(--ok)">绿</span>＝该条与标准答案某条匹配（连续2字及以上相同），<span style="color:var(--bad)">红删除线</span>＝未匹配到标准答案；标点默认正确。</div>${pointRes.html}`;
   document.getElementById('qa200HistBtn').style.display='block';
   renderQA200ListBadges();
 }
