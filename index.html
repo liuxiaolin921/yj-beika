@@ -8,7 +8,7 @@
   :root{
     --bg:#f4f6f9; --card:#ffffff; --ink:#1f2733; --sub:#6b7686;
     --line:#e4e8ef; --brand:#2f6df0; --brand-d:#1f53c4;
-    --ok:#1e9e5a; --bad:#e0533d; --warn:#e8a33d; --chip:#eef2fb;
+    --ok:#1e9e5a; --bad:#e0533d; --warn:#e8a33d; --chip:#eef2fb; --muted:#8a94a6;
   }
   *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
   body{margin:0; background:var(--bg); color:var(--ink);
@@ -21,6 +21,12 @@
   .stats{display:flex; gap:6px; flex-wrap:wrap;}
   .stat{background:var(--chip); border-radius:10px; padding:4px 9px; font-size:12px; color:var(--sub);}
   .stat b{color:var(--ink); font-size:13px;}
+  /* 顶部可点击汇总（收藏 / 已掌握 / 待加强 / 不会） */
+  .chip{background:var(--chip); border:1px solid var(--line); border-radius:10px; padding:4px 9px; font-size:12px; color:var(--sub); cursor:pointer; user-select:none;}
+  .chip b{color:var(--ink); font-size:13px;}
+  .chip:active{transform:scale(.97);}
+  .chip-fav b{color:var(--brand);}
+  .chip-m b{color:var(--ok);} .chip-s b{color:var(--warn);} .chip-u b{color:var(--bad);}
   /* 控制条 */
   .ctrl{background:var(--card); border:1px solid var(--line); border-radius:14px; padding:10px; margin-bottom:12px;}
   .row{display:flex; gap:8px; flex-wrap:wrap; align-items:center;}
@@ -121,8 +127,8 @@
   .b-new{background:var(--chip); color:var(--sub);}
   .b-log{background:#e7ecff; color:#3b5bdb;}
   .b-m{background:#e3f6ec; color:var(--ok);} .b-s{background:#fff3e0; color:var(--warn);} .b-u{background:#fdeae6; color:var(--bad);}
-  .fav-toggle{float:right; font-size:18px; line-height:1; color:var(--sub); cursor:pointer; margin:2px 0 0 8px; user-select:none;}
-  .fav-toggle.on{color:var(--warn);}
+  .fav-toggle{float:right; font-size:12px; font-weight:600; color:var(--sub); cursor:pointer; margin:2px 0 0 8px; user-select:none; border:1px solid var(--line); border-radius:8px; padding:3px 8px; background:#fff; line-height:1.4;}
+  .fav-toggle.on{color:#fff; border-color:var(--warn); background:var(--warn);}
   .fav-li{padding-right:6px;}
   .fav-group-h{font-weight:700; font-size:14px; color:var(--brand); margin:16px 0 6px; border-left:4px solid var(--brand); padding-left:8px;}
   .btn.ghost.on, .mini.on{color:var(--warn); border-color:var(--warn); background:#fff7ec;}
@@ -130,6 +136,8 @@
   .tag-m.on{background:var(--ok); color:#fff; border-color:var(--ok);}
   .tag-s.on{background:var(--warn); color:#fff; border-color:var(--warn);}
   .tag-u.on{background:var(--bad); color:#fff; border-color:var(--bad);}
+  .tag-fav{color:var(--warn); border-color:var(--warn);}
+  .tag-fav.on{background:var(--warn); color:#fff; border-color:var(--warn);}
   .my-ans{background:var(--bg2,#f1f3f5); border:1px solid var(--line); border-radius:8px; padding:10px 12px;}
   .my-ans-label{font-size:13px; font-weight:600; color:var(--sub); margin-bottom:4px;}
   .my-ans-text{font-size:14px; line-height:1.7; white-space:pre-wrap; word-break:break-word;}
@@ -267,17 +275,11 @@
   <header>
     <div class="ttl">一建实务 · 抽背默写卡<small>题源：02背诵笔记.docx</small></div>
     <div class="stats">
-      <span class="stat">共 <b id="sTotal">0</b></span>
-      <span class="stat">已学 <b id="sRev">0</b></span>
-      <span class="stat">记住了 <b id="sOk">0</b></span>
-      <span class="stat">薄弱 <b id="sBad">0</b></span>
-      <span class="stat" title="一星=基本记得但不熟">一星 <b id="sStar1">0</b></span>
-      <span class="stat" title="二星=较熟练">二星 <b id="sStar2">0</b></span>
-      <span class="stat" title="三星=完全掌握">三星 <b id="sStar3">0</b></span>
-      <span class="stat">案例练 <b id="sCaseRev">0</b></span>
-      <span class="stat">案例掌握 <b id="sCaseOk">0</b></span>
-      <span class="stat" title="绿色高亮音频已听数量">音频 <b id="sAudio">0/0</b></span>
-      <span class="stat" title="200问抽背已评数量">200问(评) <b id="sQA200">0/0</b></span>
+      <span class="stat">共 <b id="sTotal">0</b> 题</span>
+      <span class="chip chip-fav" onclick="openStat('fav')" title="点击查看收藏的具体题目">🔖 收藏 <b id="sFav">0</b></span>
+      <span class="chip chip-m" onclick="openStat('mastered')" title="点击查看已掌握的具体题目（来自200问标签）">✅ 已掌握 <b id="sMastered">0</b></span>
+      <span class="chip chip-s" onclick="openStat('strengthen')" title="点击查看待加强的具体题目（来自200问标签）">🟠 待加强 <b id="sStrengthen">0</b></span>
+      <span class="chip chip-u" onclick="openStat('unknown')" title="点击查看不会的具体题目（来自200问标签）">❌ 不会 <b id="sUnknown">0</b></span>
     </div>
   </header>
 
@@ -291,7 +293,7 @@
       <button id="tabAudio" onclick="setMode('audio')">音频</button>
     </div>
     <button class="mini sync-btn" onclick="openSync()">🔄 同步</button>
-    <span class="ver" id="verTag" style="align-self:center;font-size:11px;color:var(--sub);margin-left:8px">v20260820-2143</span>
+    <span class="ver" id="verTag" style="align-self:center;font-size:11px;color:var(--sub);margin-left:8px">v20260820-2159</span>
   </div>
   <div class="ctrl" id="drillCtrl">
     <div class="row">
@@ -438,6 +440,7 @@
             <button class="mini tag-m" id="qa200TagMaster2" onclick="qa200SetTag('mastered')">✅ 已掌握</button>
             <button class="mini tag-s" id="qa200TagStr2" onclick="qa200SetTag('strengthen')">🟠 待加强</button>
             <button class="mini tag-u" id="qa200TagUnknown2" onclick="qa200SetTag('unknown')">❌ 不会</button>
+            <button class="mini tag-fav" id="qa200FavBtn2" onclick="favToggle('q'+QA200[qa200View.idx].num)">☆ 收藏</button>
           </div>
         </div>
         <div id="qa200Result" style="margin-top:10px"></div>
@@ -684,21 +687,24 @@ function visible(){
 }
 
 function updateStats(){
-  let s1=0,s2=0,s3=0,ok=0,bad=0;
-  DATA.forEach(it=>{ const lv=levelOf(it.id); if(lv>=4)ok++; else if(lv===3)s3++; else if(lv===2)s2++; else if(lv===1)s1++; else if(lv===0)bad++; });
-  document.getElementById('sTotal').textContent=DATA.length;
-  document.getElementById('sRev').textContent=Object.keys(prog.reviewed).length;
-  document.getElementById('sOk').textContent=ok;
-  document.getElementById('sBad').textContent=bad;
-  document.getElementById('sStar1').textContent=s1;
-  document.getElementById('sStar2').textContent=s2;
-  document.getElementById('sStar3').textContent=s3;
-  document.getElementById('sCaseRev').textContent=Object.keys(prog.cReviewed||{}).length;
-  document.getElementById('sCaseOk').textContent=Object.keys(prog.cMastered||{}).length;
-  document.getElementById('sAudio').textContent=Object.keys(prog.tAudio||{}).length + '/' + (AUDIO_ITEMS? AUDIO_ITEMS.length : 0);
-  const qa200el=document.getElementById('sQA200');
-  if(qa200el) qa200el.textContent=Object.keys(prog.qa200Stars||{}).length + '/' + (QA200? QA200.length : 0);
+  const tg = prog.qa200Tags||{};
+  const tM=Object.keys(tg).filter(k=>tg[k]==='mastered').length;
+  const tS=Object.keys(tg).filter(k=>tg[k]==='strengthen').length;
+  const tU=Object.keys(tg).filter(k=>tg[k]==='unknown').length;
+  const favN = prog.fav ? Object.keys(prog.fav).length : 0;
+  document.getElementById('sTotal').textContent = DATA.length;
+  document.getElementById('sFav').textContent = favN;
+  document.getElementById('sMastered').textContent = tM;
+  document.getElementById('sStrengthen').textContent = tS;
+  document.getElementById('sUnknown').textContent = tU;
   updateFavCnt();
+}
+function openStat(t){
+  if(t==='fav'){ setMode('fav'); window.scrollTo({top:0,behavior:'smooth'}); return; }
+  // 已掌握 / 待加强 / 不会：跳到 200问 并按对应标签筛选查看具体题目
+  qa200View.query=''; qa200View.only=t;
+  const sel=document.getElementById('qa200Only'); if(sel) sel.value=t;
+  setMode('qa200'); window.scrollTo({top:0,behavior:'smooth'});
 }
 
 function setMode(m){
@@ -1223,7 +1229,7 @@ function renderList(){
     const lb = (lg && lg.length) ? `<span class="badge b-log">练${lg.length}</span>` : '';
     const qn2 = it.num ? `<span class="qnum">${esc(it.num)}</span>` : '';
     const fk='d'+it.id, fOn=isFav(fk);
-    return `<div class="li" onclick="openFromList(${it.id})">${cb}${b}${lb}${qn2}<div class="qt">${esc(it.title)}</div><div class="meta">${esc(it.chapter)} ＞ ${esc(it.sub)}</div><span class="fav-toggle ${fOn?'on':''}" onclick="event.stopPropagation(); favToggle('${fk}'); renderList();" title="收藏/取消收藏">${fOn?'★':'☆'}</span></div>`;
+    return `<div class="li" onclick="openFromList(${it.id})">${cb}${b}${lb}${qn2}<div class="qt">${esc(it.title)}</div><div class="meta">${esc(it.chapter)} ＞ ${esc(it.sub)}</div><span class="fav-toggle ${fOn?'on':''}" onclick="event.stopPropagation(); favToggle('${fk}'); renderList();" title="点一下收藏/取消收藏">${fOn?'★ 已收藏':'☆ 收藏'}</span></div>`;
   }).join('');
 }
 function openFromList(id){
@@ -1890,6 +1896,7 @@ function qa200ShowDetail(idx){
   qa200ApplyRateUI(it.num);
   qa200ApplyTagUI(it.num);
   const fk='q'+it.num; const fb=document.getElementById('qa200FavBtn'); if(fb){ fb.classList.toggle('on', isFav(fk)); fb.textContent=favLabel(fk); }
+  const fb2=document.getElementById('qa200FavBtn2'); if(fb2){ fb2.classList.toggle('on', isFav(fk)); fb2.textContent=favLabel(fk); }
 }
 // 抽背/默写模式切换
 function qa200SetMode(m){
