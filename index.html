@@ -75,6 +75,7 @@
   .diff.show{display:block;}
   .diff .hit, .diff-box .hit{color:var(--ok);}
   .diff .miss, .diff-box .miss{color:var(--bad); text-decoration:line-through; opacity:.8;}
+  .diff .miss-ans, .diff-box .miss-ans{color:var(--bad); font-weight:bold; opacity:.9;}
   .diff-cap{font-size:12px; font-weight:600; color:var(--muted); margin:8px 0 2px;}
   .diff-box{background:var(--card); border:1px solid var(--line); border-radius:8px; padding:8px 10px; font-size:14px; line-height:1.8; white-space:pre-wrap; word-break:break-word;}
   .qa-pt{padding:3px 8px; border-radius:4px; margin:2px 0; font-size:14px; line-height:1.55;}
@@ -293,7 +294,7 @@
       <button id="tabAudio" onclick="setMode('audio')">音频</button>
     </div>
     <button class="mini sync-btn" onclick="openSync()">🔄 同步</button>
-    <span class="ver" id="verTag" style="align-self:center;font-size:11px;color:var(--sub);margin-left:8px">v20260820-2319</span>
+    <span class="ver" id="verTag" style="align-self:center;font-size:11px;color:var(--sub);margin-left:8px">v20260821-0845</span>
   </div>
   <div class="ctrl" id="drillCtrl">
     <div class="row">
@@ -1036,8 +1037,50 @@ function splitUserPoints(a){
   return out;
 }
 
+// 对两个已匹配上的得分点做字级对齐：共同字词标绿，用户多写/错字标红删除线，标准答案多写/正确字标红加粗
+function alignTwoPoints(u, s){
+  const un = normText(u), sn = normText(s);
+  const n = un.length, m = sn.length;
+  // 先求 LCS 长度
+  const dp = Array.from({length:n+1}, ()=>new Uint16Array(m+1));
+  for(let i=n-1;i>=0;i--) for(let j=m-1;j>=0;j--)
+    dp[i][j] = un[i]===sn[j] ? dp[i+1][j+1]+1 : Math.max(dp[i+1][j], dp[i][j+1]);
+  // 回溯，记录匹配位置
+  const uMatch = new Array(n).fill(false), sMatch = new Array(m).fill(false);
+  let i=0, j=0;
+  while(i<n && j<m){
+    if(un[i]===sn[j]){ uMatch[i]=true; sMatch[j]=true; i++; j++; }
+    else if(dp[i+1][j] >= dp[i][j+1]) i++;
+    else j++;
+  }
+  function build(raw, match, missCls){
+    let html='', curClass='';
+    let ni=0;
+    for(let k=0;k<raw.length;k++){
+      const ch=raw[k];
+      const isPunct = PUNCT.test(ch);
+      let cls=missCls;
+      if(!isPunct){
+        cls = match[ni] ? 'hit' : missCls;
+        ni++;
+      } else if(curClass){
+        cls = curClass; // 标点跟随前一个字的显示样式，避免打断
+      }
+      if(cls !== curClass){
+        if(curClass) html+='</span>';
+        html+=`<span class="${cls}">`;
+        curClass=cls;
+      }
+      html+=esc(ch);
+    }
+    if(curClass) html+='</span>';
+    return html;
+  }
+  return {uHtml: build(u, uMatch, 'miss'), sHtml: build(s, sMatch, 'miss-ans')};
+}
+
 // 按用户得分点整体对照：把用户答案按标点/换行拆成得分点，每个得分点去标准答案中找最佳匹配
-// 连续≥2字相同即认为该得分点命中，整条得分点标绿；未命中整条标红删除线；标准答案中未被命中的点标红删除线
+// 命中得分点内部再做字级对齐（共同字绿、用户错字红删除线、标准答案错/漏字红加粗）
 function diffByPoints(rawUser, rawAns){
   const userPts = splitUserPoints(rawUser);
   const ansPts = splitUserPoints(rawAns); // 标准答案同样按换行/顿号/逗号/分号/句号拆分成得分点
@@ -1049,13 +1092,16 @@ function diffByPoints(rawUser, rawAns){
     let bestIdx = -1;
     let bestLen = 0;
     for(let i=0;i<ansPts.length;i++){
+      if(matchedAns.has(i)) continue;
       const len = lcsLen(up.norm, ansPts[i].norm);
       if(len >= 2 && len > bestLen){ bestIdx = i; bestLen = len; }
     }
     if(bestIdx >= 0){
       matchedAns.add(bestIdx);
       hit++;
-      userHtml += `<span class="hit">${esc(up.raw)}</span>`;
+      const aligned = alignTwoPoints(up.raw, ansPts[bestIdx].raw);
+      ansPts[bestIdx]._html = aligned.sHtml;
+      userHtml += aligned.uHtml;
     } else {
       userHtml += `<span class="miss">${esc(up.raw)}</span>`;
     }
@@ -1065,8 +1111,11 @@ function diffByPoints(rawUser, rawAns){
 
   let ansHtml = '';
   for(let i=0;i<ansPts.length;i++){
-    if(matchedAns.has(i)) ansHtml += `<span class="hit">${esc(ansPts[i].raw)}</span>`;
-    else ansHtml += `<span class="miss">${esc(ansPts[i].raw)}</span>`;
+    if(matchedAns.has(i) && ansPts[i]._html){
+      ansHtml += ansPts[i]._html;
+    } else {
+      ansHtml += `<span class="miss-ans">${esc(ansPts[i].raw)}</span>`;
+    }
     ansHtml += '、';
   }
   ansHtml = ansHtml.replace(/、$/,'');
@@ -2056,7 +2105,7 @@ function qa200Check(){
   pruneLogs();
   save(); updateStats();
   document.getElementById('qa200Result').innerHTML =
-    `<div class="meta" style="margin-bottom:6px">命中采分点 <b style="color:var(--ok)">${hit}</b>/${pts.length}（${pct}%）。下方按你写的每条得分点整体对照：<span style="color:var(--ok)">绿</span>＝该条与标准答案某条匹配（连续2字及以上相同），<span style="color:var(--bad)">红删除线</span>＝未匹配到标准答案；标点默认正确。</div>${pointRes.html}`;
+    `<div class="meta" style="margin-bottom:6px">命中采分点 <b style="color:var(--ok)">${hit}</b>/${pts.length}（${pct}%）。下方按你写的每条得分点对照：<span style="color:var(--ok)">绿字</span>＝与标准答案一致，<span style="color:var(--bad)">红删除线</span>＝你写错/多写的字，<span style="color:var(--bad);font-weight:bold">红加粗</span>＝标准答案中你漏写/写错的字；标点默认正确。</div>${pointRes.html}`;
   document.getElementById('qa200HistBtn').style.display='block';
   renderQA200ListBadges();
 }
