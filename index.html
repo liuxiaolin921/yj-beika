@@ -290,11 +290,10 @@
       <button id="tabList" onclick="setMode('list')">题目列表</button>
       <button id="tabQA200" onclick="setMode('qa200')">200问</button>
       <button id="tabCase" onclick="setMode('case')">案例100</button>
-      <button id="tabFav" onclick="setMode('fav')">收藏<span class="cnt" id="favCnt"></span></button>
       <button id="tabAudio" onclick="setMode('audio')">音频</button>
     </div>
     <button class="mini sync-btn" onclick="openSync()">🔄 同步</button>
-    <span class="ver" id="verTag" style="align-self:center;font-size:11px;color:var(--sub);margin-left:8px">v20260821-0845</span>
+    <span class="ver" id="verTag" style="align-self:center;font-size:11px;color:var(--sub);margin-left:8px">v20260821-1015</span>
   </div>
   <div class="ctrl" id="drillCtrl">
     <div class="row">
@@ -718,7 +717,6 @@ function setMode(m){
   document.getElementById('tabList').classList.toggle('on', m==='list');
   document.getElementById('tabQA200').classList.toggle('on', m==='qa200');
   document.getElementById('tabCase').classList.toggle('on', m==='case');
-  document.getElementById('tabFav').classList.toggle('on', m==='fav');
   document.getElementById('tabAudio').classList.toggle('on', m==='audio');
   const isCase = m==='case';
   const isAudio = m==='audio';
