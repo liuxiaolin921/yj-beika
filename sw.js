@@ -1,8 +1,10 @@
-// 一建实务 PWA Service Worker —— 应用外壳缓存 + 专题图懒缓存 + 断网可用
-const CACHE = 'yj-beika-v1';
+// 一建实务 PWA Service Worker —— 应用外壳缓存 + 运行时缓存 + 断网可用
+const CACHE = 'yj-beika-v2';
 const SHELL = [
   './',
   './index.html',
+  './gl/index.html',
+  './yj/index.html',
   './manifest.webmanifest',
   './icon-192.png',
   './icon-512.png',
@@ -35,23 +37,26 @@ self.addEventListener('fetch', function (e) {
   const url = new URL(req.url);
   if (url.origin !== self.location.origin) return;
 
-  // 页面导航：网络优先，失败回退缓存（保证更新及时 + 离线可用）
+  // 页面导航：网络优先，失败回退缓存（按真实 URL 缓存，保证更新及时 + 离线可用）
   if (req.mode === 'navigate') {
     e.respondWith((async function () {
+      const cacheKey = url.pathname;
       try {
         const res = await fetch(req);
         const cache = await caches.open(CACHE);
-        cache.put('./index.html', res.clone());
+        cache.put(cacheKey, res.clone());
         return res;
       } catch (err) {
         const cache = await caches.open(CACHE);
-        return (await cache.match('./index.html')) || (await cache.match('./'));
+        return (await cache.match(cacheKey)) ||
+               (await cache.match('./index.html')) ||
+               (await cache.match('./'));
       }
     })());
     return;
   }
 
-  // 静态资源（含专题聚焦图片）：缓存优先 + 后台静默刷新
+  // 静态资源（含音频/专题图）：缓存优先 + 后台静默刷新
   e.respondWith((async function () {
     const cache = await caches.open(CACHE);
     const cached = await cache.match(req);

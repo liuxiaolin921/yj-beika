@@ -1,14 +1,14 @@
 {
-  "name": "一建建筑实务 · 抽背默写",
+  "name": "一建实务 · 建筑/公路",
   "short_name": "一建实务",
-  "description": "一级建造师建筑工程管理与实务：抽背、默写、案例训练与专题聚焦，进度云同步",
+  "description": "一级建造师实务备考：建筑工程（抽背默写）与公路工程（真题刷题）双专业合一，进度云同步",
   "lang": "zh-CN",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
   "display_override": ["standalone", "minimal-ui"],
-  "background_color": "#0B2A6B",
-  "theme_color": "#0B2A6B",
+  "background_color": "#1f57d6",
+  "theme_color": "#2f6df0",
   "orientation": "portrait",
   "categories": ["education", "productivity"],
   "icons": [
