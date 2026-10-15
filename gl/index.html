@@ -137,6 +137,20 @@
   .qstar.on.s1{background:#ffe7a8; color:#a9710a;}
   .qstar.on.s2{background:#bfeae3; color:#0a7a6b;}
   .qstar.on.s3{background:#bfe9c9; color:#15703a;}
+  /* 简答默写（参考建筑抽背：连续2字标绿） */
+  .qwrite{width:100%; min-height:96px; margin:10px 0 2px; font-size:15px; line-height:1.7;
+    padding:11px 12px; border:1px solid var(--line); border-radius:12px; background:#fff; color:var(--ink);
+    resize:vertical; font-family:inherit; box-sizing:border-box;}
+  .qwrite:focus{outline:none; border-color:#bcd0f7; box-shadow:0 0 0 3px #eef4ff;}
+  .qdiff{margin:8px 0 2px;}
+  .qdiff:empty{display:none;}
+  .qdiff .meta{font-size:12.5px; color:var(--sub); line-height:1.6; margin-bottom:4px;}
+  .diff-cap{font-size:12px; font-weight:700; color:var(--brand); margin:8px 0 4px;}
+  .diff-box{font-size:14.5px; line-height:1.9; white-space:pre-wrap; word-break:break-word;
+    background:#f8fafc; border:1px solid var(--line); border-radius:10px; padding:10px 12px; margin-bottom:6px;}
+  .hit{color:var(--ok);}
+  .miss{color:var(--bad); text-decoration:line-through;}
+  .miss-ans{color:var(--bad); font-weight:700;}
 </style>
 </head>
 <body>
@@ -632,7 +646,7 @@ $('#helpBody').innerHTML=`
   }]
 }</pre>
 <p><b>④ 进度：</b>保存在本机浏览器（localStorage），换设备不会自动同步。</p>
-<p><b>⑤ 千题斩（填空默写）：</b>按「篇→章→节」筛选，点题干中的空格填入答案后「检查」，红色为错、绿色为对；卡片下方 ★ 可标一/二/三星（生疏/模糊/熟练）。导入含 <code>qian</code> 数组的 JSON 可扩充题库：</p>
+<p><b>⑤ 千题斩（填空默写）：</b>按「篇→章→节」筛选，点题干中的空格填入答案后「检查」，红色为错、绿色为对；<b>简答题（无填空）卡片下方留有默写框，写完点「检查」会逐字对照答案——连续 2 字及以上与标准相同标绿，不一致/多写/漏写标红删除线，标点默认正确</b>；卡片下方 ★ 可标一/二/三星（生疏/模糊/熟练）。导入含 <code>qian</code> 数组的 JSON 可扩充题库：</p>
 <pre>{
   "qian":[{
     "id":"1.1.2-1","pian":"第1篇 公路工程技术","chap":"第1章 路基工程",
@@ -671,6 +685,20 @@ function qianSetStar(id,lv){
 function qianMarkDone(id){ if(!prog.qianDone) prog.qianDone={}; prog.qianDone[id]=true; save(); }
 function qNorm(s){ return (s||'').toLowerCase().replace(/[\s（）()、，,。.\/]/g,''); }
 function qianCheck(q, card){
+  const isOpen=!(q.blanks&&q.blanks.length);
+  if(isOpen){
+    const ta=card.querySelector('.qwrite');
+    const val=(ta?ta.value:'').trim();
+    const dd=card.querySelector('.qdiff');
+    if(!val){ if(dd) dd.innerHTML=''; toast('请先在上方空白框内默写答案，再点「检查」'); return; }
+    const r=qComputeDiff(val, q.ans||'');
+    if(dd) dd.innerHTML=r.html;
+    qianMarkDone(q.id);
+    const res=card.querySelector('.qresult');
+    if(res) res.textContent='✅ 已批改（绿＝连续2字及以上与标准相同，红删除线＝与标准不一致/多写）';
+    save(); updateQianCnt();
+    return;
+  }
   const ins=card.querySelectorAll('.qblank'); let allOk=true;
   if(ins.length){
     ins.forEach((inp,i)=>{
@@ -703,6 +731,116 @@ function qianStemHTML(q){
   }
   return html;
 }
+/* ---- 简答题默写批改：字符级对照（连续≥2字标绿，不一致/多写标红删除线）----
+   规则与一建建筑抽背模式 computeDiff 一致：标点不计入、默认正确。 ---- */
+const QPUNCT = /[　-〿＀-￯\s,.!?;:'"()\[\]<>{}_\-~`—…·、。；：？！""''（）《》〈〉【】「」『』〖〗]/;
+function qNormText(s){ return (s||'').replace(QPUNCT,''); }
+function qLcsLen(x, y){
+  const n=x.length, m=y.length;
+  if(!n||!m) return 0;
+  const dp = Array.from({length:n+1}, ()=>new Uint16Array(m+1));
+  for(let i=n-1;i>=0;i--) for(let j=m-1;j>=0;j--)
+    dp[i][j] = x[i]===y[j] ? dp[i+1][j+1]+1 : Math.max(dp[i+1][j], dp[i][j+1]);
+  return dp[0][0];
+}
+function qDiffChar(rawUser, rawAns){
+  const a = [...rawAns].map(c => ({c, p: QPUNCT.test(c)}));
+  const b = [...rawUser].filter(c => !QPUNCT.test(c));
+  const ac = a.filter(x => !x.p).map(x => x.c);
+  const n = ac.length, m = b.length;
+  const dp = Array.from({length:n+1}, () => new Uint16Array(m+1));
+  for(let i=n-1;i>=0;i--) for(let j=m-1;j>=0;j--)
+    dp[i][j] = ac[i]===b[j] ? dp[i+1][j+1]+1 : Math.max(dp[i+1][j], dp[i][j+1]);
+  const hitStd = new Array(n).fill(false);
+  const hitUser = new Array(m).fill(false);
+  let i=0, j=0;
+  while(i<n && j<m){
+    if(ac[i]===b[j]){ hitStd[i]=true; hitUser[j]=true; i++; j++; }
+    else if(dp[i+1][j] >= dp[i][j+1]) i++;
+    else j++;
+  }
+  const acToA = [];
+  a.forEach((x,k)=>{ if(!x.p) acToA.push(k); });
+  const stdMatched = a.map(()=>false);
+  for(let k=0;k<n;k++) if(hitStd[k]) stdMatched[acToA[k]] = true;
+  function runs(flags){
+    const g = new Array(flags.length).fill(false);
+    let run=0;
+    for(let k=0;k<flags.length;k++){
+      if(flags[k]) run++; else run=0;
+      if(run>=2){ g[k]=true; if(k-1>=0) g[k-1]=true; }
+    }
+    return g;
+  }
+  const gStd = runs(stdMatched);
+  const gUser = runs(hitUser);
+  let uh='', buf='', cls='';
+  function flushU(){ if(!buf) return;
+    if(cls==='hit') uh+=`<span class="hit">${esc(buf)}</span>`;
+    else if(cls==='miss') uh+=`<span class="miss">${esc(buf)}</span>`;
+    else uh+=esc(buf); buf=''; }
+  for(let k=0;k<m;k++){
+    if(gUser[k]){ if(cls!=='hit'){ flushU(); cls='hit'; } buf+=b[k]; }
+    else { if(cls!=='miss'){ flushU(); cls='miss'; } buf+=b[k]; }
+  }
+  flushU();
+  let sh='', buf2='', cls2='';
+  function flushS(){ if(!buf2) return;
+    if(cls2==='hit') sh+=`<span class="hit">${esc(buf2)}</span>`;
+    else if(cls2==='miss') sh+=`<span class="miss">${esc(buf2)}</span>`;
+    else sh+=esc(buf2); buf2=''; }
+  for(let k=0;k<a.length;k++){
+    const x=a[k];
+    if(x.p){ flushS(); sh+=esc(x.c); continue; }
+    if(gStd[k]){ if(cls2!=='hit'){ flushS(); cls2='hit'; } buf2+=x.c; }
+    else { if(cls2!=='miss'){ flushS(); cls2='miss'; } buf2+=x.c; }
+  }
+  flushS();
+  let hit=0, total=0;
+  for(let k=0;k<m;k++){ total++; if(hitUser[k]) hit++; }
+  const pct = total ? Math.round(hit/total*100) : 0;
+  const html =
+    `<div class="meta">你写对约 <b>${hit}</b>/${total} 字（${pct}%）；绿＝连续2字及以上与标准相同，红删除线＝与标准不一致/多写，标点默认正确</div>`+
+    `<div class="diff-cap">你写的：</div><div class="diff-box">${uh}</div>`+
+    `<div class="diff-cap">标准答案：</div><div class="diff-box">${sh}</div>`;
+  return {html, hit, total};
+}
+function qSplitPoints(a){
+  const raw = (a||'').split(/\n+/).map(s=>s.trim()).filter(Boolean);
+  const pts=[];
+  for(const line of raw){
+    for(const seg of line.split(/[；;]/)){
+      const s = seg.trim().replace(/[。．.]$/, '').trim();
+      if(!s) continue;
+      pts.push(s);
+    }
+  }
+  const NUM = /^[（(]?\d{1,2}[)）、.．]|^[①-⑳]|^[一二三四五六七八九十]+[、.．]/;
+  const out=[]; const seen=new Set();
+  for(const rawText of pts){
+    const key = rawText.replace(NUM,'').trim();
+    const norm = key.replace(/[　\s，,。．、；;：:？！?（）()【】「」"'《》<>]/g,'');
+    if(!norm || norm.length<2) continue;
+    if(seen.has(norm)) continue;
+    seen.add(norm);
+    out.push({raw: rawText, norm});
+  }
+  return out;
+}
+function qComputeDiff(rawUser, rawAns){
+  const charRes = qDiffChar(rawUser, rawAns);
+  const pts = qSplitPoints(rawAns);
+  if(pts.length >= 2){
+    const unorm = qNormText(rawUser);
+    let hit=0;
+    for(const p of pts){ if(qLcsLen(p.norm, unorm) >= 2) hit++; }
+    const pct = Math.round(hit/pts.length*100);
+    const meta = `<div class="meta">采分点命中 <b style="color:var(--ok)">${hit}</b>/${pts.length}（${pct}%）｜ 下方为你写的答案逐字对照：<span style="color:var(--ok)">绿</span>=连续2字及以上与标准相同，<span style="color:var(--bad)">红删除线</span>=与标准不一致/多写，标点默认正确</div>`;
+    return {html: meta + charRes.html, hit, total: pts.length};
+  }
+  return charRes;
+}
+
 function qianCard(q){
   const lv=qianStar(q.id), done=qianDone(q.id);
   const impBadge=q.imp?badge('b-flag',q.imp):'';
@@ -711,13 +849,18 @@ function qianCard(q){
   const ansHTML = isOpen
     ? `<span class="ab">${esc(q.ans||'（暂无参考答案，待校）')}</span>`
     : q.blanks.map((b,i)=>`<span class="ab">（${i+1}）${esc(b)}</span>`).join('　');
+  const writeBox = isOpen
+    ? `<textarea class="qwrite" data-id="${q.id}" placeholder="在此默写答案（写完后点「检查」）…"></textarea>
+       <div class="qdiff"></div>`
+    : '';
   return `<div class="card qcard">
     <div class="crumbs">${badge('b-year',esc(q.chap))}${badge('b-case',esc(q.sec))}${impBadge}${isOpen?badge('b-part','简答'):''}${done?badge('b-part','已练'):''}</div>
     <div class="q qian-q"><span class="qno">${esc(q.no||'')}</span>. ${qianStemHTML(q)}</div>
+    ${writeBox}
     <div class="qans"><b>参考答案：</b>${ansHTML}</div>
     <div class="qresult"></div>
     <div class="qactions">
-      <button class="mini" onclick="qianCheck(qById('${q.id}'),this.closest('.qcard'))">${isOpen?'显示答案':'检查'}</button>
+      <button class="mini" onclick="qianCheck(qById('${q.id}'),this.closest('.qcard'))">检查</button>
       <button class="mini" onclick="this.closest('.qcard').querySelectorAll('.qans').forEach(a=>a.classList.toggle('show'))">显示/隐藏答案</button>
       <span class="qstars">${starBtns}</span>
     </div>
